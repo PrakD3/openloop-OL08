@@ -84,7 +84,7 @@ if %errorlevel% neq 0 (
 )
 
 :: Pull the model
-docker exec openloop-ol08-ollama-1 ollama pull gemma3:4b
+docker exec openloop-ol08-ollama-1 ollama pull gemma4:e4b
 
 echo.
 echo   ============================
