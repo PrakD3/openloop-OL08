@@ -24,18 +24,18 @@ from typing import Optional
 
 import httpx
 import numpy as np
-from PIL import Image
 from langsmith import traceable
+from PIL import Image
 
-from config.settings import settings
 from agents.state import AgentFinding, AgentState
-
+from config.settings import settings
 
 # ── Hive AI (Online) ────────────────────────────────────────────────────────
 
 HIVE_API_URL = "https://api.thehive.ai/api/v2/task/sync"
 # Hive returns a list of classes with scores. We look for these class labels:
 HIVE_AI_CLASSES = {"ai_generated", "deepfake", "manipulated_media"}
+
 
 async def _hive_detect_frame(client: httpx.AsyncClient, frame_path: str) -> float:
     """
@@ -93,48 +93,48 @@ async def _hive_detect(state: AgentState) -> AgentFinding:
         status="done",
         score=round(max_score),  # Use max (most suspicious frame)
         findings=_build_findings(max_score, avg_score, flagged, source="Hive AI"),
-        detail=json.dumps({
-            "source": "hive_ai",
-            "per_frame_scores": scores_pct,
-            "flagged_frames": [str(f) for f in flagged],
-            "max_score": max_score,
-            "avg_score": avg_score,
-        }),
+        detail=json.dumps(
+            {
+                "source": "hive_ai",
+                "per_frame_scores": scores_pct,
+                "flagged_frames": [str(f) for f in flagged],
+                "max_score": max_score,
+                "avg_score": avg_score,
+            }
+        ),
     )
 
 
 # ── DeepSafe (Offline/Local Docker) ──────────────────────────────────────────
 
-async def _deepsafe_detect_frame(client: httpx.AsyncClient, frame_path: str) -> float:
+
+async def _deepsafe_detect_frame(client: httpx.AsyncClient, frame_path: str) -> Optional[float]:
     """
     POST a single frame to local DeepSafe Docker API.
-    Returns confidence score 0.0-1.0.
+    Returns confidence score 0.0-1.0, or None on error.
 
     DeepSafe API contract:
-      POST {DEEPSAFE_URL}/api/detect
-      Body: {"image_base64": "<base64>", "model": "CrossEfficientViT"}
-      Response: {"is_fake": bool, "confidence": float, "model_used": str}
+      POST {DEEPSAFE_URL}/predict
+      Form: image=@file.jpg, media_type=image
+      Response: {"is_fake": bool, "confidence": float}
     """
     try:
         with open(frame_path, "rb") as f:
-            image_b64 = base64.b64encode(f.read()).decode("utf-8")
-        payload = {
-            "image_base64": image_b64,
-            "model": "CrossEfficientViT",  # Best for video frames
-        }
-        response = await client.post(
-            f"{settings.deepsafe_url}/api/detect",
-            json=payload,
-            timeout=15.0,
-        )
+            # Try 'image' field (standard)
+            files = {"image": (Path(frame_path).name, f, "image/jpeg")}
+            data = {"media_type": "image"}
+            response = await client.post(
+                f"{settings.deepsafe_url}/predict",
+                files=files,
+                data=data,
+                timeout=15.0,
+            )
         response.raise_for_status()
         data = response.json()
-        confidence = float(data.get("confidence", 0.0))
-        is_fake = data.get("is_fake", False)
-        return confidence if is_fake else (1.0 - confidence)
+        return float(data.get("confidence", 0.0))
     except Exception as e:
         print(f"[DeepFake/DeepSafe] Frame {frame_path} failed: {e}")
-        return 0.0
+        return None  # Sentinel — distinguishes a true error from a real 0.0 score
 
 
 async def _deepsafe_detect(state: AgentState) -> AgentFinding:
@@ -153,11 +153,24 @@ async def _deepsafe_detect(state: AgentState) -> AgentFinding:
         return await _heuristic_detect(state)
 
     async with httpx.AsyncClient() as client:
-        scores = await asyncio.gather(
+        raw_results = await asyncio.gather(
             *[_deepsafe_detect_frame(client, frame) for frame in keyframes]
         )
 
-    scores_pct = [s * 100 for s in scores]
+    # Count how many frames errored (returned None) vs. actually scored
+    failed_count = sum(1 for r in raw_results if r is None)
+    total = len(keyframes)
+    if failed_count > total // 2:
+        # Majority of frames returned errors — DeepSafe /predict is broken
+        # (most likely: no model_endpoints configured in deepsafe_config.json)
+        print(
+            f"[DeepFake] DeepSafe /predict failed for {failed_count}/{total} frames "
+            f"— falling back to pixel-variance heuristic"
+        )
+        return await _heuristic_detect(state)
+
+    # At least some frames scored successfully; treat failures as 0.0
+    scores_pct = [(r if r is not None else 0.0) * 100 for r in raw_results]
     max_score = max(scores_pct) if scores_pct else 0
     avg_score = statistics.mean(scores_pct) if scores_pct else 0
     flagged = [keyframes[i] for i, s in enumerate(scores_pct) if s > 60]
@@ -167,17 +180,20 @@ async def _deepsafe_detect(state: AgentState) -> AgentFinding:
         status="done",
         score=round(max_score),
         findings=_build_findings(max_score, avg_score, flagged, source="DeepSafe (local)"),
-        detail=json.dumps({
-            "source": "deepsafe_local",
-            "per_frame_scores": scores_pct,
-            "flagged_frames": [str(f) for f in flagged],
-            "max_score": max_score,
-            "avg_score": avg_score,
-        }),
+        detail=json.dumps(
+            {
+                "source": "deepsafe_local",
+                "per_frame_scores": scores_pct,
+                "flagged_frames": [str(f) for f in flagged],
+                "max_score": max_score,
+                "avg_score": avg_score,
+            }
+        ),
     )
 
 
 # ── Heuristic Fallback (Always Available) ─────────────────────────────────────
+
 
 async def _heuristic_detect(state: AgentState) -> AgentFinding:
     """
@@ -200,7 +216,7 @@ async def _heuristic_detect(state: AgentState) -> AgentFinding:
             block_variances = []
             for y in range(0, h - 8, 8):
                 for x in range(0, w - 8, 8):
-                    block = arr[y:y+8, x:x+8]
+                    block = arr[y : y + 8, x : x + 8]
                     block_variances.append(float(np.var(block)))
             # Very low variance = suspiciously smooth = likely AI
             avg_block_var = statistics.mean(block_variances) if block_variances else 0
@@ -220,24 +236,31 @@ async def _heuristic_detect(state: AgentState) -> AgentFinding:
         agent_id="deepfake_detector",
         status="done",
         score=round(avg_score),  # Use avg for heuristic (less reliable)
-        findings=_build_findings(max_score, avg_score, flagged, source="Heuristic (offline fallback)")
-            + ["⚠️ Low-accuracy fallback — Hive AI or DeepSafe not available"],
-        detail=json.dumps({
-            "source": "heuristic_fallback",
-            "per_frame_scores": frame_scores,
-            "flagged_frames": [str(f) for f in flagged],
-            "max_score": max_score,
-            "avg_score": avg_score,
-        }),
+        findings=_build_findings(
+            max_score, avg_score, flagged, source="Heuristic (offline fallback)"
+        )
+        + ["⚠️ Low-accuracy fallback — Hive AI or DeepSafe not available"],
+        detail=json.dumps(
+            {
+                "source": "heuristic_fallback",
+                "per_frame_scores": frame_scores,
+                "flagged_frames": [str(f) for f in flagged],
+                "max_score": max_score,
+                "avg_score": avg_score,
+            }
+        ),
     )
 
 
 # ── Shared Helpers ────────────────────────────────────────────────────────────
 
+
 def _build_findings(max_score: float, avg_score: float, flagged: list, source: str) -> list[str]:
     findings = [f"Detection source: {source}"]
     if max_score >= 85:
-        findings.append(f"HIGH confidence of AI generation ({max_score:.0f}% on most suspicious frame)")
+        findings.append(
+            f"HIGH confidence of AI generation ({max_score:.0f}% on most suspicious frame)"
+        )
     elif max_score >= 60:
         findings.append(f"Moderate AI generation signals detected ({max_score:.0f}% peak score)")
     else:
@@ -259,6 +282,7 @@ def _error_finding(message: str) -> AgentFinding:
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
+
 @traceable(name="deepfake_detector")
 async def deepfake_detector_node(state: AgentState) -> AgentFinding:
     """
@@ -266,6 +290,7 @@ async def deepfake_detector_node(state: AgentState) -> AgentFinding:
     Automatically routes to correct detector based on INFERENCE_MODE.
     Always has a working fallback — this node never raises an exception.
     """
+    print(f"\n[AGENT] deepfake_detector: Started AI-generation check...")
     try:
         if settings.inference_mode == "offline":
             return await _deepsafe_detect(state)

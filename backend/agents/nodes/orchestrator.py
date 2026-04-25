@@ -12,8 +12,8 @@ from typing import Any, Dict
 
 from langsmith import traceable
 
-from config.settings import get_llm, settings
 from agents.state import AgentFinding, AgentState
+from config.settings import get_llm, settings
 
 ORCHESTRATOR_PROMPT = """
 You are the Vigilens Orchestrator. Three AI agents have analysed a disaster video.
@@ -63,8 +63,13 @@ async def orchestrator_node(state: AgentState) -> Dict:
         else:
             raw = str(llm(prompt))
 
-        # Strip markdown fences if present
-        raw = raw.strip().strip("```json").strip("```").strip()
+        # Strip markdown fences if present — note: str.strip(chars) removes a SET
+        # of characters, not a substring, so we must use split() instead.
+        raw = raw.strip()
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
         verdict_data = json.loads(raw)
     except Exception as exc:
         verdict_data = {
@@ -79,11 +84,27 @@ async def orchestrator_node(state: AgentState) -> Dict:
             "key_flags": ["LLM error — manual review required"],
         }
 
+    # Normalise the verdict — LLMs (especially smaller local models) often
+    # capitalise it, add punctuation, or include extra words, e.g.:
+    #   "Misleading", "Misleading content", "AI Generated", "Real"
+    # Map all variations down to the four valid Literal values.
+    VALID_VERDICTS = {"real", "misleading", "ai-generated", "unverified"}
+    raw_verdict = str(verdict_data.get("verdict", "unverified")).lower().strip().strip(".")
+    if raw_verdict not in VALID_VERDICTS:
+        if "mislead" in raw_verdict:
+            raw_verdict = "misleading"
+        elif any(k in raw_verdict for k in ("ai", "generat", "fake", "deepfake", "synthetic")):
+            raw_verdict = "ai-generated"
+        elif any(k in raw_verdict for k in ("real", "authentic", "genuine", "legit")):
+            raw_verdict = "real"
+        else:
+            raw_verdict = "unverified"
+
     return {
         **state,
-        "verdict": verdict_data.get("verdict", "unverified"),
-        "credibility_score": int(verdict_data.get("credibility_score", 0)),
-        "panic_index": int(verdict_data.get("panic_index", 5)),
+        "verdict": raw_verdict,
+        "credibility_score": max(0, min(100, int(verdict_data.get("credibility_score", 0)))),
+        "panic_index": max(0, min(10, int(verdict_data.get("panic_index", 5)))),
         "summary": verdict_data.get("summary", ""),
         "source_origin": verdict_data.get("source_origin"),
         "original_date": verdict_data.get("original_date"),

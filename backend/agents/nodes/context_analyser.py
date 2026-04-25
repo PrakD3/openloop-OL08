@@ -27,11 +27,11 @@ import easyocr
 import httpx
 from langsmith import traceable
 
-from config.settings import settings, get_llm
 from agents.state import AgentFinding, AgentState
-
+from config.settings import get_llm, settings
 
 # ── Audio Transcription ───────────────────────────────────────────────────────
+
 
 async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
     """
@@ -64,6 +64,7 @@ async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
     # Offline / fallback: Local Whisper
     try:
         import whisper
+
         model = whisper.load_model(settings.whisper_model_size)
         result = model.transcribe(audio_path)
         return result.get("text", "")
@@ -74,6 +75,7 @@ async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
 
 # ── OCR on Keyframes ──────────────────────────────────────────────────────────
 
+
 def _extract_ocr_text(keyframes: list[str]) -> str:
     """
     Run EasyOCR on all keyframes. Supports multilingual text.
@@ -82,9 +84,11 @@ def _extract_ocr_text(keyframes: list[str]) -> str:
     """
     if not keyframes:
         return ""
-    try:
-        # Detect these languages from on-screen text
-        reader = easyocr.Reader(["en", "hi", "ta", "ar", "fr", "es"], gpu=False)
+
+    def _make_reader(langs: list[str]) -> easyocr.Reader:
+        return easyocr.Reader(langs, gpu=False)
+
+    def _run_ocr(reader: easyocr.Reader) -> str:
         all_text = []
         for frame_path in keyframes:
             try:
@@ -93,7 +97,34 @@ def _extract_ocr_text(keyframes: list[str]) -> str:
             except Exception as e:
                 print(f"[Context/OCR] Frame {frame_path} failed: {e}")
         return " | ".join(all_text)
+
+    try:
+        # Initialise OCR engine (English + Tamil)
+        reader = _make_reader(["en", "ta"])
+        return _run_ocr(reader)
     except Exception as e:
+        err_str = str(e)
+        if "size mismatch" in err_str or "state_dict" in err_str:
+            # Stale / incompatible model files in the EasyOCR cache directory.
+            # This happens when EasyOCR is upgraded but old checkpoint files remain.
+            # Fix: wipe the cache so EasyOCR re-downloads the correct weights.
+            print(
+                "[Context/OCR] Model cache mismatch detected — clearing EasyOCR "
+                "cache and retrying with English-only model..."
+            )
+            import shutil
+
+            cache_dir = Path.home() / ".EasyOCR" / "model"
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir)
+                print(f"[Context/OCR] Cleared stale model cache at: {cache_dir}")
+            try:
+                # English-only uses a smaller, more stable checkpoint
+                reader = _make_reader(["en"])
+                return _run_ocr(reader)
+            except Exception as e2:
+                print(f"[Context/OCR] EasyOCR retry (en-only) also failed: {e2}")
+                return ""
         print(f"[Context/OCR] EasyOCR failed: {e}")
         return ""
 
@@ -101,6 +132,7 @@ def _extract_ocr_text(keyframes: list[str]) -> str:
 # ── GDACS Disaster Database ───────────────────────────────────────────────────
 
 GDACS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH"
+
 
 async def _query_gdacs(location: Optional[str] = None, event_type: Optional[str] = None) -> list:
     """
@@ -110,7 +142,7 @@ async def _query_gdacs(location: Optional[str] = None, event_type: Optional[str]
     """
     try:
         params = {
-            "fromDate": "2020-01-01",   # Broad range to catch recirculated old videos
+            "fromDate": "2020-01-01",  # Broad range to catch recirculated old videos
             "toDate": "2025-12-31",
             "alertlevel": "Orange,Red",  # Significant events only
         }
@@ -134,6 +166,7 @@ async def _query_gdacs(location: Optional[str] = None, event_type: Optional[str]
 # ── OpenStreetMap Nominatim ───────────────────────────────────────────────────
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+
 
 async def _geocode_location(location_name: str) -> Optional[dict]:
     """
@@ -167,6 +200,7 @@ async def _geocode_location(location_name: str) -> Optional[dict]:
 # ── Open-Meteo Historical Weather ─────────────────────────────────────────────
 
 OPENMETEO_URL = "https://archive-api.open-meteo.com/v1/archive"
+
 
 async def _get_historical_weather(lat: float, lon: float, date: str) -> Optional[dict]:
     """
@@ -207,6 +241,7 @@ async def _get_historical_weather(lat: float, lon: float, date: str) -> Optional
 
 CLAIMBUSTER_URL = "https://idir.uta.edu/claimbuster/api/v2/score/text/"
 
+
 async def _check_claims(text: str) -> list:
     """
     Send transcript/OCR text to ClaimBuster to detect check-worthy claims.
@@ -230,10 +265,12 @@ async def _check_claims(text: str) -> list:
                     data = response.json()
                     for result in data.get("results", []):
                         if result.get("score", 0) > 0.5:  # Check-worthy threshold
-                            claims.append({
-                                "text": result.get("text"),
-                                "score": result.get("score"),
-                            })
+                            claims.append(
+                                {
+                                    "text": result.get("text"),
+                                    "score": result.get("score"),
+                                }
+                            )
         return claims
     except Exception as e:
         print(f"[Context/ClaimBuster] Failed: {e}")
@@ -266,20 +303,24 @@ Based only on the above, answer in JSON (no markdown):
 }}
 """
 
-async def _analyse_context_with_llm(transcript: str, ocr_text: str,
-                                     gdacs_events: list, claimed_location: str) -> dict:
+
+async def _analyse_context_with_llm(
+    transcript: str, ocr_text: str, gdacs_events: list, claimed_location: str
+) -> dict:
     """Call the orchestrator LLM to synthesise context findings."""
     try:
         llm = get_llm()
-        gdacs_summary = json.dumps([
-            {
-                "name": e.get("properties", {}).get("eventname"),
-                "type": e.get("properties", {}).get("eventtype"),
-                "date": e.get("properties", {}).get("fromdate"),
-                "country": e.get("properties", {}).get("country"),
-            }
-            for e in gdacs_events[:5]
-        ])
+        gdacs_summary = json.dumps(
+            [
+                {
+                    "name": e.get("properties", {}).get("eventname"),
+                    "type": e.get("properties", {}).get("eventtype"),
+                    "date": e.get("properties", {}).get("fromdate"),
+                    "country": e.get("properties", {}).get("country"),
+                }
+                for e in gdacs_events[:5]
+            ]
+        )
         prompt = CONTEXT_PROMPT.format(
             transcript=transcript[:1000] if transcript else "No audio transcript",
             ocr_text=ocr_text[:500] if ocr_text else "No on-screen text detected",
@@ -288,13 +329,26 @@ async def _analyse_context_with_llm(transcript: str, ocr_text: str,
         )
         response = await llm.ainvoke(prompt)
         content = response.content if hasattr(response, "content") else str(response)
+
+        # Robust JSON cleaning: remove markdown backticks
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+
         return json.loads(content)
     except Exception as e:
         print(f"[Context/LLM] Failed: {e}")
-        return {"context_suspicion_score": 50, "summary": "Context analysis unavailable", "flags": []}
+        print(f"[Context/LLM] Raw Content: {content if 'content' in locals() else 'None'}")
+        return {
+            "context_suspicion_score": 50,
+            "summary": "Context analysis failed due to malformed LLM response.",
+            "flags": ["API_RESPONSE_ERROR"],
+        }
 
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────
+
 
 @traceable(name="context_analyser")
 async def context_analyser_node(state: AgentState) -> AgentFinding:
@@ -302,6 +356,7 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
     LangGraph node entry point.
     Runs: transcription + OCR + GDACS + LLM synthesis concurrently where possible.
     """
+    print(f"\n[AGENT] context_analyser: Started context & credibility analysis...")
     keyframes = state.get("keyframes", [])
     audio_path = state.get("audio_path")
     video_url = state.get("video_url")
@@ -309,6 +364,7 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
 
     # OCR is sync — run in executor to not block event loop
     import asyncio
+
     loop = asyncio.get_event_loop()
     ocr_task = loop.run_in_executor(None, _extract_ocr_text, keyframes)
 
@@ -319,9 +375,7 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
     gdacs_task = _query_gdacs()
 
     # Run OCR, transcription, and GDACS concurrently
-    ocr_text, transcript, gdacs_events = await asyncio.gather(
-        ocr_task, transcript_task, gdacs_task
-    )
+    ocr_text, transcript, gdacs_events = await asyncio.gather(ocr_task, transcript_task, gdacs_task)
 
     # Check claims in transcript
     claims = await _check_claims(transcript or "")
@@ -357,13 +411,16 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
         status="done",
         score=suspicion_score,
         findings=findings,
-        detail=json.dumps({
-            "transcript": transcript,
-            "ocr_text": ocr_text,
-            "gdacs_events_count": len(gdacs_events),
-            "llm_result": llm_result,
-            "claims": claims,
-            "is_war_or_conflict": is_war_or_conflict,
-            "event_type": event_type,
-        }, default=str),
+        detail=json.dumps(
+            {
+                "transcript": transcript,
+                "ocr_text": ocr_text,
+                "gdacs_events_count": len(gdacs_events),
+                "llm_result": llm_result,
+                "claims": claims,
+                "is_war_or_conflict": is_war_or_conflict,
+                "event_type": event_type,
+            },
+            default=str,
+        ),
     )
