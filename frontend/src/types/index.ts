@@ -5,6 +5,13 @@ export type VerdictType = 'real' | 'misleading' | 'ai-generated' | 'unverified';
 
 export type AgentStatus = 'idle' | 'running' | 'done' | 'error';
 
+export interface ModelScore {
+  modelName: string;
+  authenticPct: number;
+  fakePct: number;
+  confidence: number;
+}
+
 export interface AgentFinding {
   agentId: string;
   agentName: string;
@@ -13,6 +20,21 @@ export interface AgentFinding {
   findings: string[];
   detail: string | null;
   duration?: number;
+  constraintsSatisfied?: number;
+  totalConstraints?: number;
+  constraintDetails?: Record<string, boolean>;
+  modelScores?: ModelScore[]; // deepfake agent only
+}
+
+export interface SOSRegion {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  centerName: string;
+  disasterType: string;
+  panicIndex: number;
+  color: string;
+  sosActive: boolean;
 }
 
 export interface AnalysisResult {
@@ -21,14 +43,14 @@ export interface AnalysisResult {
   credibilityScore: number;
   panicIndex: number;
   summary: string;
+  disasterType: string;
   sourceOrigin: string | null;
   originalDate: string | null;
   claimedLocation: string | null;
   actualLocation: string | null;
-  latitude: number | null;
-  longitude: number | null;
   keyFlags: string[];
   agents: AgentFinding[];
+  sosRegion?: SOSRegion | null;
   videoUrl?: string;
   thumbnail?: string;
 }
