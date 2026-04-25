@@ -8,6 +8,7 @@ from .nodes.context_analyser import context_analyser_node
 from .nodes.deepfake_detector import deepfake_detector_node
 from .nodes.orchestrator import orchestrator_node
 from .nodes.source_hunter import source_hunter_node
+from .nodes.notification_node import notification_node
 from .state import AgentState
 from .tools.ffmpeg_tools import extract_audio, extract_keyframes
 
@@ -27,11 +28,13 @@ def create_vigilens_graph() -> Any:
     workflow.add_node("preprocess", preprocess_node)
     workflow.add_node("parallel_analysis", parallel_analysis_node)
     workflow.add_node("orchestrator", orchestrator_node)
+    workflow.add_node("notification", notification_node)
 
     workflow.set_entry_point("preprocess")
     workflow.add_edge("preprocess", "parallel_analysis")
     workflow.add_edge("parallel_analysis", "orchestrator")
-    workflow.add_edge("orchestrator", END)
+    workflow.add_edge("orchestrator", "notification")
+    workflow.add_edge("notification", END)
 
     return workflow.compile()
 
