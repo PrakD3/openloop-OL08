@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, XCircle, HelpCircle, Megaphone } from 'lucide-react';
+import { CheckCircle2, XCircle, HelpCircle, Megaphone, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MOCK_BULLETINS } from '@/lib/demoData';

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DEMO_VIDEOS, MOCK_INCIDENTS } from '@/lib/demoData';
 import { useMode } from '@/hooks/useMode';
+import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {

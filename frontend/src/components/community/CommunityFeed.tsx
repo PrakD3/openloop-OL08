@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MOCK_COMMUNITY_POSTS } from '@/lib/demoData';
 import type { CommunityPost } from '@/types';
+import { cn } from '@/lib/utils';
 
 export function CommunityFeed() {
   const { t } = useTranslation();

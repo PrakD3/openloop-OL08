@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MOCK_INCIDENTS } from '@/lib/demoData';
 import type { VerdictType } from '@/types';
+import { cn } from '@/lib/utils';
+import { MapPin } from 'lucide-react';
 
 const filters: Array<{ label: string; value: string }> = [
   { label: 'All', value: 'all' },
