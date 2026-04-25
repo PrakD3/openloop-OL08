@@ -338,6 +338,23 @@ async def source_hunter_node(state: AgentState) -> AgentFinding:
         source_suspicion += 35
     if tineye_count > 5:
         source_suspicion += 20
+
+    # Temporal Inconsistency Check
+    # If the video appeared online years before the current claim, it's recirculated.
+    temporal_inconsistency = False
+    upload_date_str = platform_meta.get("upload_date_iso") or datetime.now().strftime("%Y-%m-%d")
+    
+    if earliest_date and upload_date_str:
+        try:
+            ed = datetime.fromisoformat(earliest_date.split("T")[0])
+            ud = datetime.fromisoformat(upload_date_str.split("T")[0])
+            days_diff = (ud - ed).days
+            if days_diff > 30:  # More than a month old = repurposed
+                temporal_inconsistency = True
+                source_suspicion += min(50, (days_diff // 30) * 5) # Scale suspicion
+        except Exception:
+            pass
+
     source_suspicion = min(source_suspicion, 100)
 
     findings = []
@@ -351,6 +368,8 @@ async def source_hunter_node(state: AgentState) -> AgentFinding:
         findings.append("No GPS metadata in video file")
     if suspicious_software:
         findings.append(f"⚠️ Encoding software suggests AI generation: {exif_result.get('encoding_software')}")
+    if temporal_inconsistency:
+        findings.append("🚨 TEMPORAL INCONSISTENCY: This video appeared online long before the current claim.")
     if platform_meta.get("channel"):
         findings.append(f"Platform: {platform_meta.get('platform')} | Channel: {platform_meta.get('channel')}")
     if not findings:

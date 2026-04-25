@@ -335,6 +335,15 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
     is_war_or_conflict = llm_result.get("is_war_or_conflict", False)
     event_type = llm_result.get("event_type", "unknown")
 
+    # Temporal Check: Geocode and Weather
+    weather_info = None
+    geocoded = await _geocode_location(llm_result.get("claimed_location") or claimed_location)
+    if geocoded and llm_result.get("gdacs_match_found"):
+        # Use GDACS event date for historical weather check
+        event_date = gdacs_events[0].get("properties", {}).get("fromdate", "").split("T")[0]
+        if event_date:
+            weather_info = await _get_historical_weather(geocoded["lat"], geocoded["lon"], event_date)
+
     findings = []
     if transcript:
         findings.append(f"Audio transcribed ({len(transcript)} chars)")
@@ -346,6 +355,11 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
         findings.append(f"✅ GDACS match: {llm_result.get('gdacs_match_name', 'Unknown event')}")
     else:
         findings.append("No matching disaster event found in GDACS database")
+
+    if weather_info:
+        weather_desc = f"Precipitation: {weather_info['precipitation_mm']}mm"
+        findings.append(f"🌦️ Historical weather check: {weather_desc}")
+
     if is_war_or_conflict:
         findings.append("⚠️ Content flagged as war/conflict — elevated verification required")
     if claims:
@@ -363,6 +377,8 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
             "gdacs_events_count": len(gdacs_events),
             "llm_result": llm_result,
             "claims": claims,
+            "weather_info": weather_info,
+            "geocoded": geocoded,
             "is_war_or_conflict": is_war_or_conflict,
             "event_type": event_type,
         }, default=str),
