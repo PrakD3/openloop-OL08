@@ -228,6 +228,8 @@ async def run_analysis_task(
             latitude=final_state.get("latitude"),
             longitude=final_state.get("longitude"),
             key_flags=key_flags,
+            disaster_type=final_state.get("disaster_type", "unknown"),
+            sos_region=final_state.get("sos_region"),
             agents=agents,
         )
 

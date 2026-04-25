@@ -48,6 +48,8 @@ class AnalyzeResponse(VigilensBaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     key_flags: List[str] = []
+    disaster_type: Optional[str] = "unknown"
+    sos_region: Optional[Dict] = None
     agents: List[AgentFindingResponse] = []
 
 

@@ -8,6 +8,7 @@ LangSmith tracing is automatic when LANGSMITH_TRACING_V2=true.
 import asyncio
 import json
 import time
+import re
 from dataclasses import asdict
 from typing import Any, Dict
 
@@ -16,6 +17,8 @@ from langsmith import traceable
 from agents.state import AgentFinding, AgentState
 from api.job_store import update_progress
 from config.settings import get_llm, settings
+from ml.disaster_classifier import classify_disaster
+from ml.sos_engine import get_sos_region
 
 ORCHESTRATOR_PROMPT = """
 You are the Vigilens Orchestrator. Four AI agents have analysed a disaster video.
@@ -130,17 +133,37 @@ async def orchestrator_node(state: AgentState) -> Dict:
         else:
             raw_verdict = "unverified"
 
+    # ── SOS Region Engine ─────────────────────────────────────────────────────
+    # Only for verified real disasters with significant panic.
+    disaster_type = classify_disaster(
+        transcript=state.get("context_result").findings[0] if state.get("context_result") else None,
+        ocr_text=state.get("context_result").detail if state.get("context_result") else None,
+        video_url=state.get("video_url")
+    )
+
+    sos_region = None
+    location = verdict_data.get("actual_location") or verdict_data.get("claimed_location") or state.get("claimed_location")
+    
+    if raw_verdict == "real" and int(verdict_data.get("panic_index", 5)) >= 5 and location:
+        sos_region = await get_sos_region(
+            location=location,
+            disaster_type=disaster_type,
+            panic_index=int(verdict_data.get("panic_index", 5))
+        )
+
     result = {
         **state,
         "verdict": raw_verdict,
         "credibility_score": max(0, min(100, int(verdict_data.get("credibility_score", 0)))),
         "panic_index": max(0, min(10, int(verdict_data.get("panic_index", 5)))),
         "summary": verdict_data.get("summary", ""),
+        "disaster_type": disaster_type,
         "source_origin": verdict_data.get("source_origin"),
         "original_date": verdict_data.get("original_date"),
-        "claimed_location": verdict_data.get("claimed_location"),
+        "claimed_location": verdict_data.get("claimed_location") or state.get("claimed_location"),
         "actual_location": verdict_data.get("actual_location"),
         "key_flags": verdict_data.get("key_flags", []),
+        "sos_region": sos_region,
     }
     update_progress(job_id, 0.90, "orchestrator_done")
     return result
