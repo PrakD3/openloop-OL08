@@ -15,8 +15,7 @@ function AnalysisContent() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const videoUrl = searchParams.get("url") ?? "";
-  const demoParam = searchParams.get("demo");
-  const isDemo = demoParam === null ? config.isDemo : demoParam !== "false";
+  const isDemo = false;
 
   const { result, isLoading, agentProgress, error, analyze } = useAnalysis();
   const displayedAgents = agentProgress.length > 0 ? agentProgress : result?.agents ?? [];

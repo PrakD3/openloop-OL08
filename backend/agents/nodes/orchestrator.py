@@ -44,9 +44,6 @@ async def orchestrator_node(state: AgentState) -> Dict:
     job_id = state.get("job_id", "unknown")
     update_progress(job_id, 0.85, "orchestrator_starting")
 
-    if settings.app_mode == "demo":
-        return _demo_verdict(state)
-
     deepfake = state.get("deepfake_result")
     source = state.get("source_result")
     context = state.get("context_result")
@@ -88,10 +85,7 @@ async def orchestrator_node(state: AgentState) -> Dict:
             "key_flags": ["LLM error — manual review required"],
         }
 
-    # Normalise the verdict — LLMs (especially smaller local models) often
-    # capitalise it, add punctuation, or include extra words, e.g.:
-    #   "Misleading", "Misleading content", "AI Generated", "Real"
-    # Map all variations down to the four valid Literal values.
+    # Normalise the verdict
     VALID_VERDICTS = {"real", "misleading", "ai-generated", "unverified"}
     raw_verdict = str(verdict_data.get("verdict", "unverified")).lower().strip().strip(".")
     if raw_verdict not in VALID_VERDICTS:
@@ -126,18 +120,3 @@ def _finding_to_dict(finding: Any) -> Dict:
     if hasattr(finding, "__dataclass_fields__"):
         return asdict(finding)
     return {}
-
-
-def _demo_verdict(state: AgentState) -> Dict:
-    return {
-        **state,
-        "verdict": "unverified",
-        "credibility_score": 50,
-        "panic_index": 5,
-        "summary": "Demo mode: orchestrator verdict simulated.",
-        "source_origin": None,
-        "original_date": None,
-        "claimed_location": None,
-        "actual_location": None,
-        "key_flags": ["Demo mode active"],
-    }

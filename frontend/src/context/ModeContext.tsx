@@ -17,11 +17,11 @@ interface ModeContextValue {
 const ModeContext = createContext<ModeContextValue | null>(null);
 
 export function ModeProvider({ children }: { children: React.ReactNode }) {
-  const [appMode, setAppMode] = useState<AppMode>(config.appMode);
-  const [inferenceMode] = useState<InferenceMode>(config.inferenceMode);
+  const [appMode] = useState<AppMode>('real');
+  const [inferenceMode] = useState<InferenceMode>('online');
 
   const toggleAppMode = useCallback(() => {
-    setAppMode((prev) => (prev === 'demo' ? 'real' : 'demo'));
+    // No-op in production
   }, []);
 
   return (
@@ -29,10 +29,10 @@ export function ModeProvider({ children }: { children: React.ReactNode }) {
       value={{
         appMode,
         inferenceMode,
-        isDemo: appMode === 'demo',
-        isReal: appMode === 'real',
-        isOnline: inferenceMode === 'online',
-        isOffline: inferenceMode === 'offline',
+        isDemo: false,
+        isReal: true,
+        isOnline: true,
+        isOffline: false,
         toggleAppMode,
       }}
     >

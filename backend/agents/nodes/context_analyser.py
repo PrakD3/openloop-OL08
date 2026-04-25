@@ -1,19 +1,8 @@
 """
-Context Analyser Agent Node (Simple Version)
-=============================================
+Context Analyser Agent Node
+==========================
 Transcribes audio → extracts on-screen text → cross-references with disaster databases.
-
-Online mode:  OpenAI Whisper API + Groq vision LLM
-Offline mode: Local Whisper model + Ollama vision LLM
-
-Free APIs (no key needed):
-  GDACS:          https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH
-  Open-Meteo:     https://archive-api.open-meteo.com/v1/archive
-  Nominatim:      https://nominatim.openstreetmap.org/search
-  Wayback Machine: http://archive.org/wayback/available
-
-Free API (key required, free tier):
-  ClaimBuster:    https://idir.uta.edu/claimbuster/api/v2/score/text/
+Uses Groq Whisper and Groq Vision for all processing.
 """
 
 import asyncio
@@ -30,32 +19,17 @@ from config.settings import get_llm, is_deprecated_groq_model, settings
 
 # ── Audio Transcription ───────────────────────────────────────────────────────
 
-
 async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
     """
     Transcribe audio using Whisper. Priority order:
-
-    1. Groq Whisper API   (whisper_use_groq=true + groq_api_key set)
-       → whisper-large-v3-turbo on Groq cloud — fast, no local model download
-    2. OpenAI Whisper API (whisper_use_api=true + openai_api_key set)
-       → whisper-1 on OpenAI — reliable fallback
-    3. Local Whisper      (always available, slow on first run — downloads model)
-
-    Returns transcript text, or None if no audio / all methods fail.
+    1. Groq Whisper API (fastest, preferred)
+    2. OpenAI Whisper API (fallback)
     """
     if not audio_path or not Path(audio_path).exists():
         return None
 
-    # ── Priority 1: Groq Whisper API ─────────────────────────────────────────
-    # Groq hosts Whisper Large v3 / v3-Turbo as a cloud API.
-    # Same request format as OpenAI, just a different base URL + key.
-    # This avoids the ~minutes-long local model download on cold start.
     if settings.whisper_use_groq and settings.groq_api_key:
-        print(
-            f"[Context/Whisper] Using Groq API ({settings.groq_whisper_model}) "
-            f"for transcription...",
-            flush=True,
-        )
+        print(f"[Context/Whisper] Using Groq API ({settings.groq_whisper_model})...", flush=True)
         try:
             async with httpx.AsyncClient() as client:
                 with open(audio_path, "rb") as f:
@@ -68,21 +42,12 @@ async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
                     )
                     response.raise_for_status()
                     data = response.json()
-                    text = data.get("text", "")
-                    print(
-                        f"[Context/Whisper] Groq transcription succeeded ({len(text)} chars)",
-                        flush=True,
-                    )
-                    return text
+                    return data.get("text", "")
         except Exception as e:
-            print(
-                f"[Context/Whisper] Groq API failed: {e} — falling back to next method",
-                flush=True,
-            )
+            print(f"[Context/Whisper] Groq API failed: {e}", flush=True)
 
-    # ── Priority 2: OpenAI Whisper API ───────────────────────────────────────
     if settings.whisper_use_api and settings.openai_api_key:
-        print("[Context/Whisper] Using OpenAI Whisper API for transcription...", flush=True)
+        print("[Context/Whisper] Using OpenAI Whisper API...", flush=True)
         try:
             async with httpx.AsyncClient() as client:
                 with open(audio_path, "rb") as f:
@@ -95,53 +60,19 @@ async def _transcribe_audio(audio_path: Optional[str]) -> Optional[str]:
                     )
                     response.raise_for_status()
                     data = response.json()
-                    text = data.get("text", "")
-                    print(
-                        f"[Context/Whisper] OpenAI transcription succeeded ({len(text)} chars)",
-                        flush=True,
-                    )
-                    return text
+                    return data.get("text", "")
         except Exception as e:
-            print(
-                f"[Context/Whisper] OpenAI API failed: {e} — falling back to local model",
-                flush=True,
-            )
+            print(f"[Context/Whisper] OpenAI API failed: {e}", flush=True)
 
-    # ── Priority 3: Local Whisper (always available, slow cold start) ─────────
-    print(
-        f"[Context/Whisper] Loading local Whisper model "
-        f"'{settings.whisper_model_size}' (may download on first run)...",
-        flush=True,
-    )
-    try:
-        import whisper
-
-        model = whisper.load_model(settings.whisper_model_size)
-        result = model.transcribe(audio_path)
-        text = result.get("text", "")
-        print(
-            f"[Context/Whisper] Local transcription succeeded ({len(text)} chars)",
-            flush=True,
-        )
-        return text
-    except Exception as e:
-        print(f"[Context/Whisper] Local model failed: {e}", flush=True)
-        return None
-
+    return None
 
 # ── OCR on Keyframes ──────────────────────────────────────────────────────────
 
-
 async def _extract_ocr_text_online(keyframes: list[str]) -> str:
-    """
-    Extract text from keyframes using Groq Vision (Online OCR).
-    This replaces local EasyOCR for better accuracy and zero local overhead.
-    """
+    """Extract text from keyframes using Groq Vision."""
     if not keyframes or not settings.groq_api_key:
         return ""
 
-    # We take the 1st and middle frames to capture most on-screen text
-    # without hitting heavy rate limits.
     indices = [0, len(keyframes) // 2] if len(keyframes) > 1 else [0]
     target_frames = [keyframes[i] for i in indices]
     
@@ -178,146 +109,43 @@ async def _extract_ocr_text_online(keyframes: list[str]) -> str:
                     text = data["choices"][0]["message"]["content"].strip()
                     if text:
                         all_text.append(text)
-                else:
-                    print(
-                        f"[Context/OnlineOCR] HTTP {response.status_code} "
-                        f"model={settings.groq_vision_model!r} frame={frame_path} "
-                        f"body={response.text[:500]!r}",
-                        flush=True,
-                    )
             except Exception as e:
-                print(
-                    f"[Context/OnlineOCR] Frame {frame_path} failed "
-                    f"with model={settings.groq_vision_model!r}: {e}",
-                    flush=True,
-                )
+                print(f"[Context/OnlineOCR] Frame {frame_path} failed: {e}", flush=True)
     
     return " | ".join(all_text)
-
 
 # ── GDACS Disaster Database ───────────────────────────────────────────────────
 
 GDACS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH"
 
-
 async def _query_gdacs(location: Optional[str] = None, event_type: Optional[str] = None) -> list:
-    """
-    Query the Global Disaster Alert and Coordination System (GDACS).
-    Free public API, no key needed.
-    Returns list of recent disaster events.
-    """
+    """Query the Global Disaster Alert and Coordination System (GDACS)."""
     try:
         params = {
-            "fromDate": "2020-01-01",  # Broad range to catch recirculated old videos
+            "fromDate": "2020-01-01",
             "toDate": "2025-12-31",
-            "alertlevel": "Orange,Red",  # Significant events only
+            "alertlevel": "Orange,Red",
         }
         if event_type:
-            params["eventtype"] = event_type  # EQ, FL, TC, VO, DR, TS, WF
+            params["eventtype"] = event_type
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                GDACS_URL,
-                params=params,
-                timeout=10.0,
-                headers={"Accept": "application/json"},
-            )
+            response = await client.get(GDACS_URL, params=params, timeout=10.0, headers={"Accept": "application/json"})
             response.raise_for_status()
             data = response.json()
-            return data.get("features", [])[:20]  # Top 20 events
+            return data.get("features", [])[:20]
     except Exception as e:
         print(f"[Context/GDACS] Failed: {e}")
         return []
-
-
-# ── OpenStreetMap Nominatim ───────────────────────────────────────────────────
-
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-
-
-async def _geocode_location(location_name: str) -> Optional[dict]:
-    """
-    Convert a place name to GPS coordinates using OSM Nominatim.
-    Free, no API key. Be respectful: max 1 req/sec (handled by asyncio).
-    """
-    if not location_name:
-        return None
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                NOMINATIM_URL,
-                params={"q": location_name, "format": "json", "limit": 1},
-                headers={"User-Agent": "Vigilens/1.0 (disaster-misinformation-detection)"},
-                timeout=8.0,
-            )
-            response.raise_for_status()
-            results = response.json()
-            if results:
-                return {
-                    "lat": float(results[0]["lat"]),
-                    "lon": float(results[0]["lon"]),
-                    "display_name": results[0]["display_name"],
-                }
-            return None
-    except Exception as e:
-        print(f"[Context/Nominatim] Failed: {e}")
-        return None
-
-
-# ── Open-Meteo Historical Weather ─────────────────────────────────────────────
-
-OPENMETEO_URL = "https://archive-api.open-meteo.com/v1/archive"
-
-
-async def _get_historical_weather(lat: float, lon: float, date: str) -> Optional[dict]:
-    """
-    Get historical weather for a location and date.
-    Free API, no key needed.
-    date format: YYYY-MM-DD
-    """
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                OPENMETEO_URL,
-                params={
-                    "latitude": lat,
-                    "longitude": lon,
-                    "start_date": date,
-                    "end_date": date,
-                    "daily": "precipitation_sum,weathercode",
-                    "timezone": "auto",
-                },
-                timeout=8.0,
-            )
-            response.raise_for_status()
-            data = response.json()
-            daily = data.get("daily", {})
-            if daily.get("time"):
-                return {
-                    "date": daily["time"][0] if daily["time"] else None,
-                    "precipitation_mm": daily.get("precipitation_sum", [None])[0],
-                    "weather_code": daily.get("weathercode", [None])[0],
-                }
-            return None
-    except Exception as e:
-        print(f"[Context/OpenMeteo] Failed: {e}")
-        return None
-
 
 # ── ClaimBuster API ───────────────────────────────────────────────────────────
 
 CLAIMBUSTER_URL = "https://idir.uta.edu/claimbuster/api/v2/score/text/"
 
-
 async def _check_claims(text: str) -> list:
-    """
-    Send transcript/OCR text to ClaimBuster to detect check-worthy claims.
-    Free API, key required (get at idir.uta.edu/claimbuster).
-    Returns list of claims with scores.
-    """
+    """Send transcript/OCR text to ClaimBuster."""
     if not settings.claimbuster_api_key or not text:
         return []
     try:
-        # ClaimBuster works best with sentences, not full paragraphs
         sentences = [s.strip() for s in text.split(".") if len(s.strip()) > 20][:5]
         claims = []
         async with httpx.AsyncClient() as client:
@@ -330,18 +158,12 @@ async def _check_claims(text: str) -> list:
                 if response.status_code == 200:
                     data = response.json()
                     for result in data.get("results", []):
-                        if result.get("score", 0) > 0.5:  # Check-worthy threshold
-                            claims.append(
-                                {
-                                    "text": result.get("text"),
-                                    "score": result.get("score"),
-                                }
-                            )
+                        if result.get("score", 0) > 0.5:
+                            claims.append({"text": result.get("text"), "score": result.get("score")})
         return claims
     except Exception as e:
         print(f"[Context/ClaimBuster] Failed: {e}")
         return []
-
 
 # ── LLM Context Analysis ──────────────────────────────────────────────────────
 
@@ -369,18 +191,15 @@ Based only on the above, answer in JSON (no markdown):
 }}
 """
 
-
 async def _analyse_context_with_llm(
     transcript: str, ocr_text: str, gdacs_events: list, claimed_location: str, keyframes: list[str] = None
 ) -> dict:
     """Call the orchestrator LLM to synthesise context findings."""
     try:
-        # Use a vision-capable model if in online mode
         model_name = settings.groq_orchestrator_model
         is_vision = False
         
-        # If we have a Groq key and frames, we can use the vision model
-        if settings.inference_mode == "online" and settings.groq_api_key and keyframes:
+        if settings.groq_api_key and keyframes:
             model_name = settings.groq_vision_model
             is_vision = True
 
@@ -405,19 +224,10 @@ async def _analyse_context_with_llm(
         )
 
         if is_vision and keyframes:
-            # Encode one representative frame (the middle one)
             mid_idx = len(keyframes) // 2
             with open(keyframes[mid_idx], "rb") as f:
                 encoded = base64.b64encode(f.read()).decode("utf-8")
             
-            print(f"[Context/LLM] Using Groq Vision ({model_name}) with representative frame...")
-            if is_deprecated_groq_model(model_name):
-                print(
-                    f"[Context/LLM] WARNING: configured Groq vision model {model_name!r} is deprecated.",
-                    flush=True,
-                )
-            
-            # We use httpx directly for vision since ChatGroq wrapper might not handle multi-modal perfectly yet
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -441,22 +251,13 @@ async def _analyse_context_with_llm(
                     },
                     timeout=25.0,
                 )
-                if response.status_code != 200:
-                    print(
-                        f"[Context/LLM] Vision HTTP {response.status_code} model={model_name!r} "
-                        f"body={response.text[:500]!r}",
-                        flush=True,
-                    )
                 response.raise_for_status()
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
         else:
-            # Standard text-only invocation
-            print(f"[Context/LLM] Using text-only model ({model_name})...")
             response = await llm.ainvoke(prompt_text)
             content = response.content if hasattr(response, "content") else str(response)
 
-        # Robust JSON cleaning: remove markdown backticks
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
@@ -471,96 +272,50 @@ async def _analyse_context_with_llm(
             "flags": ["API_RESPONSE_ERROR"],
         }
 
-
 # ── Main Entry Point ──────────────────────────────────────────────────────────
-
 
 @traceable(name="context_analyser")
 async def context_analyser_node(state: AgentState) -> AgentFinding:
-    """
-    LangGraph node entry point.
-    Runs: transcription + OCR + GDACS + LLM synthesis concurrently where possible.
-    """
-    print(f"\n[AGENT] context_analyser: Started context & credibility analysis...")
+    """LangGraph node entry point."""
+    print(f"\n[AGENT] context_analyser: Started analysis...")
     keyframes = state.get("keyframes", [])
     audio_path = state.get("audio_path")
-    claimed_location = (
-        state.get("claimed_location")
-        or state.get("metadata", {}).get("location")
-        or "Unknown"
-    )
-    print(
-        f"[AGENT] context_analyser: keyframes={len(keyframes)} "
-        f"audio={'yes' if audio_path else 'no'} "
-        f"claimed_location={claimed_location!r}",
-        flush=True,
-    )
+    claimed_location = state.get("claimed_location") or state.get("metadata", {}).get("location") or "Unknown"
 
-    # OCR (now online via Groq Vision)
     ocr_task = _extract_ocr_text_online(keyframes)
-
-    # Whisper transcription (async)
     transcript_task = _transcribe_audio(audio_path)
-
-    # GDACS query (async, no key needed)
     gdacs_task = _query_gdacs()
 
-    # Run OCR, transcription, and GDACS concurrently
     ocr_text, transcript, gdacs_events = await asyncio.gather(ocr_task, transcript_task, gdacs_task)
-    print(
-        f"[AGENT] context_analyser: OCR chars={len(ocr_text or '')} "
-        f"transcript chars={len(transcript or '')} gdacs_events={len(gdacs_events)}",
-        flush=True,
-    )
-
-    # Check claims in transcript
     claims = await _check_claims(transcript or "")
 
-    # LLM synthesis
     llm_result = await _analyse_context_with_llm(
         transcript or "", ocr_text or "", gdacs_events, claimed_location, keyframes
     )
-    print(
-        f"[AGENT] context_analyser: LLM result keys={sorted(llm_result.keys())}",
-        flush=True,
-    )
-
-    suspicion_score = llm_result.get("context_suspicion_score", 50)
-    is_war_or_conflict = llm_result.get("is_war_or_conflict", False)
-    event_type = llm_result.get("event_type", "unknown")
 
     findings = []
-    if transcript:
-        findings.append(f"Audio transcribed ({len(transcript)} chars)")
-    else:
-        findings.append("No audio transcript available")
-    if ocr_text:
-        findings.append(f"On-screen text detected: {ocr_text[:100]}...")
+    if transcript: findings.append(f"Audio transcribed ({len(transcript)} chars)")
+    if ocr_text: findings.append(f"On-screen text detected: {ocr_text[:100]}...")
     if llm_result.get("gdacs_match_found"):
-        findings.append(f"✅ GDACS match: {llm_result.get('gdacs_match_name', 'Unknown event')}")
+        findings.append(f"✅ GDACS match: {llm_result.get('gdacs_match_name')}")
     else:
-        findings.append("No matching disaster event found in GDACS database")
-    if is_war_or_conflict:
-        findings.append("⚠️ Content flagged as war/conflict — elevated verification required")
+        findings.append("No matching disaster event found in GDACS")
+    if llm_result.get("is_war_or_conflict"):
+        findings.append("⚠️ War/conflict content detected")
     if claims:
-        findings.append(f"ClaimBuster: {len(claims)} check-worthy claims detected")
+        findings.append(f"ClaimBuster: {len(claims)} claims detected")
     findings.extend(llm_result.get("flags", []))
 
     return AgentFinding(
         agent_id="context_analyser",
         status="done",
-        score=suspicion_score,
+        score=llm_result.get("context_suspicion_score", 50),
         findings=findings,
-        detail=json.dumps(
-            {
-                "transcript": transcript,
-                "ocr_text": ocr_text,
-                "gdacs_events_count": len(gdacs_events),
-                "llm_result": llm_result,
-                "claims": claims,
-                "is_war_or_conflict": is_war_or_conflict,
-                "event_type": event_type,
-            },
-            default=str,
-        ),
+        detail=json.dumps({
+            "transcript": transcript,
+            "ocr_text": ocr_text,
+            "gdacs_events_count": len(gdacs_events),
+            "llm_result": llm_result,
+            "claims": claims,
+        }, default=str),
     )

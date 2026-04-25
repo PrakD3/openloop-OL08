@@ -130,8 +130,7 @@ async def _groq_vision_detect(state: AgentState) -> AgentFinding:
         flush=True,
     )
     if not valid_results:
-        print("[DeepFake] Groq Vision failed for all frames, using heuristic fallback")
-        return await _heuristic_detect(state)
+        return _error_finding("DeepFake analysis failed (no valid results from Groq Vision)")
 
     # Aggregate results
     all_findings = []
@@ -161,154 +160,6 @@ async def _groq_vision_detect(state: AgentState) -> AgentFinding:
     )
 
 
-# ── DeepSafe (Offline/Local Docker) ──────────────────────────────────────────
-
-
-# ── DeepSafe (Offline/Local Docker) ──────────────────────────────────────────
-
-
-async def _deepsafe_detect_frame(client: httpx.AsyncClient, frame_path: str) -> Optional[float]:
-    """
-    POST a single frame to local DeepSafe Docker API.
-    Returns confidence score 0.0-1.0, or None on error.
-
-    DeepSafe API contract:
-      POST {DEEPSAFE_URL}/predict
-      Form: image=@file.jpg, media_type=image
-      Response: {"is_fake": bool, "confidence": float}
-    """
-    try:
-        with open(frame_path, "rb") as f:
-            # Try 'image' field (standard)
-            files = {"image": (Path(frame_path).name, f, "image/jpeg")}
-            data = {"media_type": "image"}
-            response = await client.post(
-                f"{settings.deepsafe_url}/predict",
-                files=files,
-                data=data,
-                timeout=15.0,
-            )
-        response.raise_for_status()
-        data = response.json()
-        return float(data.get("confidence", 0.0))
-    except Exception as e:
-        print(f"[DeepFake/DeepSafe] Frame {frame_path} failed: {e}")
-        return None  # Sentinel — distinguishes a true error from a real 0.0 score
-
-
-async def _deepsafe_detect(state: AgentState) -> AgentFinding:
-    """Run all keyframes through local DeepSafe. Fallback to heuristic if Docker down."""
-    keyframes = state.get("keyframes", [])
-    if not keyframes:
-        return _error_finding("No keyframes available for analysis")
-
-    # Check DeepSafe is reachable first
-    try:
-        async with httpx.AsyncClient() as client:
-            health = await client.get(f"{settings.deepsafe_url}/health", timeout=3.0)
-            health.raise_for_status()
-    except Exception:
-        print("[DeepFake] DeepSafe Docker not reachable, falling back to heuristic")
-        return await _heuristic_detect(state)
-
-    async with httpx.AsyncClient() as client:
-        raw_results = await asyncio.gather(
-            *[_deepsafe_detect_frame(client, frame) for frame in keyframes]
-        )
-
-    # Count how many frames errored (returned None) vs. actually scored
-    failed_count = sum(1 for r in raw_results if r is None)
-    total = len(keyframes)
-    if failed_count > total // 2:
-        # Majority of frames returned errors — DeepSafe /predict is broken
-        # (most likely: no model_endpoints configured in deepsafe_config.json)
-        print(
-            f"[DeepFake] DeepSafe /predict failed for {failed_count}/{total} frames "
-            f"— falling back to pixel-variance heuristic"
-        )
-        return await _heuristic_detect(state)
-
-    # At least some frames scored successfully; treat failures as 0.0
-    scores_pct = [(r if r is not None else 0.0) * 100 for r in raw_results]
-    max_score = max(scores_pct) if scores_pct else 0
-    avg_score = statistics.mean(scores_pct) if scores_pct else 0
-    flagged = [keyframes[i] for i, s in enumerate(scores_pct) if s > 60]
-
-    return AgentFinding(
-        agent_id="deepfake_detector",
-        status="done",
-        score=round(max_score),
-        findings=_build_findings(max_score, avg_score, flagged, source="DeepSafe (local)"),
-        detail=json.dumps(
-            {
-                "source": "deepsafe_local",
-                "per_frame_scores": scores_pct,
-                "flagged_frames": [str(f) for f in flagged],
-                "max_score": max_score,
-                "avg_score": avg_score,
-            }
-        ),
-    )
-
-
-# ── Heuristic Fallback (Always Available) ─────────────────────────────────────
-
-
-async def _heuristic_detect(state: AgentState) -> AgentFinding:
-    """
-    Basic pixel-variance heuristic. Always works, ~70% accuracy.
-    AI-generated images tend to have unnaturally uniform noise patterns.
-    We measure the standard deviation of pixel values across frames —
-    suspiciously low variance in certain frequency bands suggests AI generation.
-    """
-    keyframes = state.get("keyframes", [])
-    if not keyframes:
-        return _error_finding("No keyframes available for analysis")
-
-    frame_scores = []
-    for frame_path in keyframes:
-        try:
-            img = Image.open(frame_path).convert("L")  # Grayscale
-            arr = np.array(img, dtype=np.float32)
-            # Compute local variance using 8x8 blocks
-            h, w = arr.shape
-            block_variances = []
-            for y in range(0, h - 8, 8):
-                for x in range(0, w - 8, 8):
-                    block = arr[y : y + 8, x : x + 8]
-                    block_variances.append(float(np.var(block)))
-            # Very low variance = suspiciously smooth = likely AI
-            avg_block_var = statistics.mean(block_variances) if block_variances else 0
-            # Normalise: real photos typically have variance > 200
-            # AI images often < 80. Scale to 0-100 AI score.
-            ai_score = max(0.0, min(100.0, (1.0 - (avg_block_var / 300.0)) * 100))
-            frame_scores.append(ai_score)
-        except Exception as e:
-            print(f"[DeepFake/Heuristic] Frame {frame_path} failed: {e}")
-            frame_scores.append(0.0)
-
-    max_score = max(frame_scores) if frame_scores else 0
-    avg_score = statistics.mean(frame_scores) if frame_scores else 0
-    flagged = [keyframes[i] for i, s in enumerate(frame_scores) if s > 60]
-
-    return AgentFinding(
-        agent_id="deepfake_detector",
-        status="done",
-        score=round(avg_score),  # Use avg for heuristic (less reliable)
-        findings=_build_findings(
-            max_score, avg_score, flagged, source="Heuristic (offline fallback)"
-        )
-        + ["⚠️ Low-accuracy fallback — Hive AI or DeepSafe not available"],
-        detail=json.dumps(
-            {
-                "source": "heuristic_fallback",
-                "per_frame_scores": frame_scores,
-                "flagged_frames": [str(f) for f in flagged],
-                "max_score": max_score,
-                "avg_score": avg_score,
-            }
-        ),
-    )
 
 
 # ── Shared Helpers ────────────────────────────────────────────────────────────
@@ -346,30 +197,20 @@ def _error_finding(message: str) -> AgentFinding:
 async def deepfake_detector_node(state: AgentState) -> AgentFinding:
     """
     LangGraph node entry point.
-    Automatically routes to correct detector based on INFERENCE_MODE and availability.
+    Routes to Groq Vision (primary) or Hive AI (if key provided).
     """
     print(f"\n[AGENT] deepfake_detector: Started AI-generation check...")
     try:
-        if settings.inference_mode == "offline":
-            # Priority 1: Local DeepSafe Docker
-            return await _deepsafe_detect(state)
-        else:
-            # Online Mode
-            # Priority 1: Hive AI (if key provided)
-            if settings.hive_api_key:
-                return await _hive_detect(state)
-            
-            # Priority 2: Groq Vision (if key provided) - The "Groq Only" request
-            if settings.groq_api_key:
-                return await _groq_vision_detect(state)
-            
-            # Fallback
-            print("[DeepFake] Online mode but no Hive or Groq key found, using heuristic")
-            return await _heuristic_detect(state)
-            
+        # Priority 1: Groq Vision (The "Groq Only" request)
+        if settings.groq_api_key:
+            return await _groq_vision_detect(state)
+
+        # Priority 2: Hive AI (if key provided)
+        if settings.deepfake_hive_api_key:
+            return await _hive_detect(state)
+
+        return _error_finding("No API keys provided for DeepFake detection (Groq or Hive required)")
+
     except Exception as e:
-        print(f"[DeepFake] All detectors failed: {e}, using heuristic fallback")
-        try:
-            return await _heuristic_detect(state)
-        except Exception as e2:
-            return _error_finding(f"All detection methods failed: {e2}")
+        print(f"[DeepFake] All detectors failed: {e}")
+        return _error_finding(f"All detection methods failed: {e}")
