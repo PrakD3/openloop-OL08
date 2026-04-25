@@ -79,3 +79,4 @@ frontend/next-env.d.ts
 .agents/
 skills/
 skills-lock.json
+gcp-key.json
