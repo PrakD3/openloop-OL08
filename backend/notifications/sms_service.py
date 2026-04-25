@@ -21,6 +21,84 @@ from notifications.user_registry import get_all_users
 
 # ── SMS Message Templates ─────────────────────────────────────────────────────
 
+EVENT_MESSAGES = {
+    "earthquake": {
+        "emoji": "🌍",
+        "alert": "EARTHQUAKE ALERT",
+        "action": "Drop, cover, and hold on. Move away from buildings after shaking stops. Do NOT use elevators.",
+    },
+    "flood": {
+        "emoji": "🌊",
+        "alert": "FLOOD ALERT",
+        "action": "Move to higher ground immediately. Do NOT walk or drive through floodwater.",
+    },
+    "fire": {
+        "emoji": "🔥",
+        "alert": "WILDFIRE ALERT",
+        "action": "Evacuate in the direction away from the fire. Close all windows and doors before leaving.",
+    },
+    "tsunami": {
+        "emoji": "🌊",
+        "alert": "TSUNAMI ALERT",
+        "action": "Move inland and to high ground immediately. Do NOT return to the coast until officials say it is safe.",
+    },
+    "cyclone": {
+        "emoji": "🌀",
+        "alert": "CYCLONE / STORM ALERT",
+        "action": "Seek shelter in a sturdy building away from windows. Do NOT go outside during the storm.",
+    },
+    "tornado": {
+        "emoji": "🌪️",
+        "alert": "TORNADO ALERT",
+        "action": "Move to an interior room on the lowest floor. Stay away from windows.",
+    },
+    "volcano": {
+        "emoji": "🌋",
+        "alert": "VOLCANIC ACTIVITY ALERT",
+        "action": "Evacuate the area. Avoid river valleys and low-lying areas. Wear a mask if ash is present.",
+    },
+    "missile": {
+        "emoji": "🚨",
+        "alert": "MISSILE ATTACK ALERT",
+        "action": "Move to a designated shelter or lowest floor interior room immediately. Stay away from windows.",
+    },
+    "airstrike": {
+        "emoji": "🚨",
+        "alert": "AIRSTRIKE ALERT",
+        "action": "Seek underground shelter immediately. Move to the lowest floor of a sturdy building.",
+    },
+    "explosion": {
+        "emoji": "💥",
+        "alert": "EXPLOSION ALERT",
+        "action": "Move away from the area immediately. Avoid the blast zone and wait for official all-clear.",
+    },
+    "attack": {
+        "emoji": "⚠️",
+        "alert": "SECURITY ATTACK ALERT",
+        "action": "Move to a safe location immediately and follow official security guidance.",
+    },
+    "shooting": {
+        "emoji": "⚠️",
+        "alert": "ACTIVE SHOOTER ALERT",
+        "action": "Run, hide, or fight if no other option. Call emergency services when safe.",
+    },
+    "chemical": {
+        "emoji": "☣️",
+        "alert": "CHEMICAL HAZARD ALERT",
+        "action": "Move upwind and away from the area. Seal windows/doors if indoors. Do NOT touch any substance.",
+    },
+    "conflict": {
+        "emoji": "⚠️",
+        "alert": "SECURITY ALERT",
+        "action": "Move to a safe location immediately and follow official guidance.",
+    },
+    "unknown": {
+        "emoji": "🚨",
+        "alert": "EMERGENCY ALERT",
+        "action": "Follow evacuation orders and official emergency services guidance.",
+    },
+}
+
 def _build_sms_message(
     event_type: str,
     event_location: str,
@@ -28,21 +106,23 @@ def _build_sms_message(
     verdict: str,
     is_war_or_conflict: bool,
 ) -> str:
-    """Build the SMS alert message sent to nearby users."""
-    if is_war_or_conflict:
-        alert_type = "⚠️ SECURITY ALERT"
-        action = "Move to a safe location immediately and follow official guidance."
-    else:
-        alert_type = "🚨 DISASTER ALERT"
-        action = "Follow evacuation orders and official emergency services guidance."
-
+    """Build a category-specific SMS alert message."""
+    key = (event_type or "unknown").lower().strip()
+    category = EVENT_MESSAGES.get(key)
+    if not category:
+        for k in EVENT_MESSAGES:
+            if k in key or key in k:
+                category = EVENT_MESSAGES[k]
+                break
+    if not category:
+        category = EVENT_MESSAGES["conflict"] if is_war_or_conflict else EVENT_MESSAGES["unknown"]
     return (
-        f"{alert_type} — Vigilens\n"
-        f"A verified {event_type} has been detected near your location: {event_location}.\n"
+        f"{category['emoji']} {category['alert']} — Vigilens\n"
+        f"Verified event near your location: {event_location}\n"
         f"Confidence: {credibility_score}%\n"
-        f"{action}\n"
-        f"Check vigilens.app for details. Reply STOP to unsubscribe."
-    )[:1600]  # SMS limit
+        f"{category['action']}\n"
+        f"vigilens.app for details. Reply STOP to unsubscribe."
+    )[:1600]
 
 
 # ── Safety Gate ───────────────────────────────────────────────────────────────
