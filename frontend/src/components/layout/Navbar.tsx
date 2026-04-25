@@ -25,22 +25,24 @@ export function Navbar() {
   const languages = ['en', 'hi', 'ta', 'ar', 'es'];
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="sticky top-0 z-50 border-b-4 border-foreground bg-background bk-noise">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Shield className="h-6 w-6 text-accent" />
-            <span className="text-lg font-bold">Vigilens</span>
+        <div className="flex h-20 items-center justify-between">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="p-1 border-3 border-foreground bg-accent bk-shadow-sm group-hover:translate-x-[2px] group-hover:translate-y-[2px] group-hover:shadow-none transition-all">
+              <Shield className="h-8 w-8 text-foreground" />
+            </div>
+            <span className="text-2xl font-black uppercase tracking-tighter">Vigilens</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  'text-sm font-medium transition-colors hover:text-foreground',
-                  pathname === link.href ? 'text-foreground' : 'text-muted-foreground'
+                  'text-sm font-black uppercase tracking-widest transition-all hover:translate-y-[-2px] hover:text-primary',
+                  pathname === link.href ? 'text-primary underline decoration-4 underline-offset-8' : 'text-foreground'
                 )}
               >
                 {link.label}
@@ -48,11 +50,11 @@ export function Navbar() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <select
               value={i18n.language}
               onChange={(e) => i18n.changeLanguage(e.target.value)}
-              className="text-xs bg-background border border-input rounded px-2 py-1"
+              className="text-xs font-black bg-background border-3 border-foreground px-3 py-1 bk-shadow-sm focus:outline-none"
             >
               {languages.map((lang) => (
                 <option key={lang} value={lang}>
@@ -62,27 +64,27 @@ export function Navbar() {
             </select>
             <ModeToggle />
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="md:hidden"
+              className="md:hidden border-3"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </Button>
           </div>
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden border-t py-3 space-y-1">
+          <div className="md:hidden border-t-4 border-foreground py-6 space-y-2 bg-background">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  'block px-3 py-2 text-sm rounded-md',
+                  'block px-4 py-3 text-lg font-black uppercase border-3 border-transparent',
                   pathname === link.href
-                    ? 'bg-accent/10 text-accent font-medium'
-                    : 'text-muted-foreground hover:bg-secondary'
+                    ? 'bg-accent border-foreground bk-shadow-sm'
+                    : 'text-foreground hover:bg-secondary/20'
                 )}
                 onClick={() => setMobileOpen(false)}
               >

@@ -10,24 +10,24 @@ export function ModeToggle() {
   const { appMode, inferenceMode, toggleAppMode } = useMode();
 
   return (
-    <div className="flex items-center gap-2">
-      <Badge variant={inferenceMode === 'online' ? 'default' : 'secondary'} className="text-xs">
-        {inferenceMode === 'online' ? '🌐 Online' : '📦 Offline'}
+    <div className="flex items-center gap-3">
+      <Badge variant={inferenceMode === 'online' ? 'default' : 'secondary'} className="border-2 font-black text-[10px] uppercase tracking-widest px-2">
+        {inferenceMode === 'online' ? '🌐 ONLINE' : '📦 OFFLINE'}
       </Badge>
-
+ 
       <Button
-        variant="outline"
+        variant={appMode === 'real' ? 'destructive' : 'accent'}
         size="sm"
         onClick={toggleAppMode}
-        className="text-xs h-7 px-2"
+        className="h-8 px-3 font-black text-[10px] uppercase tracking-widest border-2 bk-shadow-sm"
       >
-        {appMode === 'demo' ? '🎬 Demo' : '🔴 Real'}
+        {appMode === 'demo' ? '🎬 DEMO' : '🔴 REAL'}
       </Button>
-
+ 
       {appMode === 'real' && inferenceMode === 'offline' && (
-        <div className="flex items-center gap-1 text-xs text-destructive">
+        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-destructive bg-destructive/10 border-2 border-destructive px-2 py-0.5">
           <AlertTriangle className="h-3 w-3" />
-          <span className="hidden lg:inline">Local models required</span>
+          <span className="hidden xl:inline">LOCAL MODELS REQ</span>
         </div>
       )}
     </div>

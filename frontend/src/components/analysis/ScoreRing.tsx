@@ -24,15 +24,15 @@ export function ScoreRing({
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <div className={cn('flex flex-col items-center gap-2', className)}>
-      <div className="relative" style={{ width: size, height: size }}>
+    <div className={cn('flex flex-col items-center gap-2 group', className)}>
+      <div className="relative border-4 border-foreground bg-background bk-shadow-sm p-1" style={{ width: size + 8, height: size + 8 }}>
         <svg width={size} height={size} className="rotate-[-90deg]">
           <circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
             strokeWidth={strokeWidth}
-            className="stroke-muted fill-none"
+            className="stroke-secondary fill-none"
           />
           <circle
             cx={size / 2}
@@ -41,16 +41,16 @@ export function ScoreRing({
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             className={cn('fill-none transition-all duration-700', colorClass)}
             style={{ stroke: 'currentColor' }}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-bold">{Math.round(score)}</span>
+          <span className="text-3xl font-black bk-text-shadow text-foreground">{Math.round(score)}</span>
         </div>
       </div>
-      <span className="text-xs text-muted-foreground text-center">{label}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest text-foreground text-center mt-1">{label}</span>
     </div>
   );
 }

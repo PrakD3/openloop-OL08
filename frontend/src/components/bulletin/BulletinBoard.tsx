@@ -25,41 +25,52 @@ export function BulletinBoard() {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Megaphone className="h-5 w-5 text-accent" />
-        <h2 className="text-xl font-bold">{t('bulletin.title')}</h2>
+    <div className="space-y-8">
+      <div className="flex items-center gap-4 bg-accent border-4 border-foreground p-4 bk-shadow-md -rotate-1">
+        <Megaphone className="h-8 w-8 text-foreground" />
+        <h2 className="text-3xl font-black uppercase tracking-tighter">{t('bulletin.title')}</h2>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-6">
         {MOCK_BULLETINS.map((item) => (
           <Card
             key={item.id}
             className={cn(
-              'border-l-4',
-              item.verdict === 'real' && 'border-l-accent',
-              (item.verdict === 'misleading' || item.verdict === 'ai-generated') && 'border-l-destructive',
-              item.verdict === 'unverified' && 'border-l-muted-foreground'
+              'border-4 transition-all bk-hover-scale',
+              item.verdict === 'real' && 'bg-accent/10 border-foreground shadow-bk',
+              (item.verdict === 'misleading' || item.verdict === 'ai-generated') && 'bg-destructive/10 border-foreground shadow-bk',
+              item.verdict === 'unverified' && 'bg-muted/10 border-foreground shadow-bk'
             )}
           >
-            <CardHeader className="p-4 pb-2">
-              <div className="flex items-start gap-2">
-                <VerdictIcon verdict={item.verdict} />
-                <div className="flex-1">
-                  <CardTitle className="text-sm leading-tight">{item.title}</CardTitle>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={item.verdict as 'real' | 'misleading' | 'unverified'} className="text-xs">
-                      {t(`verdict.${item.verdict}`)}
+            <CardHeader className="p-6 pb-2 border-b-4 border-foreground/10 mb-4">
+              <div className="flex items-start gap-4">
+                <div className="p-2 border-2 border-foreground bg-background bk-shadow-sm">
+                  <VerdictIcon verdict={item.verdict} />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <CardTitle className="text-xl font-black uppercase tracking-tight leading-tight">{item.title}</CardTitle>
+                  <div className="flex flex-wrap items-center gap-3 mt-1">
+                    <Badge variant={item.verdict as 'real' | 'misleading' | 'unverified'} className="border-2">
+                      {t(`verdict.${item.verdict}`).toUpperCase()}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{item.region}</span>
+                    <span className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {item.region}
+                    </span>
                   </div>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0">
-              <p className="text-sm text-muted-foreground">{item.content}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Source: {item.source} · {new Date(item.timestamp).toLocaleDateString()}
-              </p>
+            <CardContent className="px-6 pb-6 pt-0">
+              <div className="bg-background/50 p-4 border-2 border-foreground/10 bk-noise">
+                <p className="text-base font-bold leading-snug">{item.content}</p>
+              </div>
+              <div className="mt-4 flex justify-between items-center border-t-2 border-foreground/10 pt-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  SOURCE: <span className="text-foreground">{item.source.toUpperCase()}</span>
+                </p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  {new Date(item.timestamp).toLocaleDateString()}
+                </p>
+              </div>
             </CardContent>
           </Card>
         ))}
