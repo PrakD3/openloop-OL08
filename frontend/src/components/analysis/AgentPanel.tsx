@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Loader2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle, Clock, ShieldCheck, ShieldX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -17,7 +17,7 @@ function AgentStatusIcon({ status }: { status: AgentFinding['status'] }) {
     case 'running':
       return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
     case 'done':
-      return <CheckCircle2 className="h-4 w-4 text-success" />;
+      return <CheckCircle2 className="h-4 w-4 text-accent" />;
     case 'error':
       return <XCircle className="h-4 w-4 text-destructive" />;
     default:
@@ -25,59 +25,130 @@ function AgentStatusIcon({ status }: { status: AgentFinding['status'] }) {
   }
 }
 
+function ConstraintBar({
+  satisfied,
+  total,
+}: {
+  satisfied: number;
+  total: number;
+}) {
+  const pct = Math.round((satisfied / total) * 100);
+  const isGood = pct >= 70;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>Constraints: {satisfied}/{total}</span>
+        <span className={isGood ? 'text-green-500' : 'text-red-400'}>{pct}%</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${pct}%`,
+            background: isGood
+              ? 'linear-gradient(90deg, #22c55e, #16a34a)'
+              : 'linear-gradient(90deg, #ef4444, #dc2626)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function AgentPanel({ agents }: AgentPanelProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
-      <h3 className="font-black text-xs text-foreground uppercase tracking-[0.2em] bg-secondary text-white inline-block px-3 py-1 border-3 border-foreground bk-shadow-sm mb-2">
+    <div className="space-y-3">
+      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
         {t('analysis.agents')}
       </h3>
-      {agents.map((agent) => (
-        <Card
-          key={agent.agentId}
-          className={cn(
-            'transition-all duration-300 border-4',
-            agent.status === 'running' && 'border-primary ring-4 ring-primary/20',
-            agent.status === 'done' && 'border-foreground shadow-bk'
-          )}
-        >
-          <CardHeader className={cn("p-4 pb-2 border-b-4", agent.status === 'running' ? 'bg-primary/10' : 'bg-muted/30')}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-1 border-2 border-foreground bg-background bk-shadow-sm">
+      {agents.map((agent) => {
+        const isDeepfake = agent.agentId === 'deepfake-detector';
+        // For deepfake: score = fake%, lower is better → badge shows fake%
+        // For others: score = authenticity%, higher is better
+        const scorePct = agent.score ?? 0;
+        const badgeDestructive = isDeepfake ? scorePct > 50 : scorePct < 50;
+
+        return (
+          <Card
+            key={agent.agentId}
+            className={cn(
+              'transition-all duration-300',
+              agent.status === 'running' && 'border-primary/50 shadow-sm',
+              agent.status === 'done' && 'border-accent/30'
+            )}
+          >
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <AgentStatusIcon status={agent.status} />
+                  <CardTitle className="text-sm">{agent.agentName}</CardTitle>
                 </div>
-                <CardTitle className="text-sm font-black uppercase tracking-tight">{agent.agentName}</CardTitle>
+                {agent.score !== null && agent.score !== undefined && (
+                  <Badge
+                    variant={badgeDestructive ? 'destructive' : 'real'}
+                    className="text-xs"
+                  >
+                    {isDeepfake
+                      ? `${scorePct.toFixed(1)}% fake`
+                      : `${scorePct.toFixed(1)}% authentic`}
+                  </Badge>
+                )}
               </div>
-              {agent.score !== null && (
-                <Badge variant={agent.score > 50 ? 'destructive' : 'real'} className="border-2">
-                  {agent.agentId === 'deepfake-detector' || agent.agentId === 'deepfake_detector'
-                    ? `${agent.score}% FAKE`
-                    : `${agent.score}% AUTHENTIC`}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          {agent.status === 'running' && (
-            <CardContent className="px-4 pb-4 pt-4">
-              <Progress value={undefined} className="animate-pulse" />
-            </CardContent>
-          )}
-          {agent.status === 'done' && agent.findings.length > 0 && (
-            <CardContent className="px-4 pb-4 pt-4">
-              <ul className="space-y-2">
-                {agent.findings.map((finding, i) => (
-                  <li key={i} className="text-xs font-bold text-foreground flex items-start gap-2 bg-secondary/10 p-2 border-2 border-foreground/20">
-                    <span className="text-primary font-black mt-0.5">»</span>
-                    {finding}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          )}
-        </Card>
-      ))}
+            </CardHeader>
+
+            {agent.status === 'running' && (
+              <CardContent className="px-4 pb-4 pt-0">
+                <Progress value={undefined} className="h-1 animate-pulse" />
+              </CardContent>
+            )}
+
+            {agent.status === 'done' && (
+              <CardContent className="px-4 pb-4 pt-0 space-y-3">
+                {/* Constraint bar */}
+                {agent.constraintsSatisfied !== undefined && agent.totalConstraints !== undefined && (
+                  <ConstraintBar
+                    satisfied={agent.constraintsSatisfied}
+                    total={agent.totalConstraints}
+                  />
+                )}
+
+                {/* Findings */}
+                {agent.findings.length > 0 && (
+                  <ul className="space-y-1">
+                    {agent.findings.slice(0, 4).map((finding, i) => (
+                      <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <span className="text-accent mt-0.5">•</span>
+                        {finding}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Per-model scores for deepfake agent */}
+                {isDeepfake && agent.modelScores && agent.modelScores.length > 0 && (
+                  <div className="mt-2 space-y-1.5 border-t border-border pt-2">
+                    <p className="text-xs text-muted-foreground font-medium">Per model:</p>
+                    {agent.modelScores.map((m) => (
+                      <div key={m.modelName} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{m.modelName}</span>
+                        <span
+                          className={
+                            m.authenticPct >= 50 ? 'text-green-500 font-medium' : 'text-red-400 font-medium'
+                          }
+                        >
+                          {m.authenticPct.toFixed(1)}% auth / {m.fakePct.toFixed(1)}% fake
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }

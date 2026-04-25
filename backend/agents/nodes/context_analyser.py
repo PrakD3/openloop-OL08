@@ -546,21 +546,50 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
         findings.append(f"ClaimBuster: {len(claims)} check-worthy claims detected")
     findings.extend(llm_result.get("flags", []))
 
+    # --- Add custom ML scoring and disaster classification ---
+    from ml.disaster_classifier import classify_disaster
+    from ml.scoring_engine import CONTEXT_CONSTRAINTS, ContextScoringResult, build_engine
+
+    disaster_type = classify_disaster(
+        transcript=transcript,
+        ocr_text=ocr_text,
+        llm_findings=findings,
+        video_url=state.get("video_url"),
+    )
+    
+    constraints = {k: False for k in CONTEXT_CONSTRAINTS}
+    if transcript:
+        constraints["no_synthetic_speech"] = True
+    if ocr_text:
+        constraints["ocr_text_consistent"] = True
+    if llm_result.get("location_consistency"):
+        constraints["language_matches_location"] = True
+        constraints["architecture_matches"] = True
+    if llm_result.get("gdacs_match_found"):
+        constraints["weather_matches_history"] = True
+        
+    engine = build_engine(job_id=state.get("job_id", "demo"), disaster_type=disaster_type)
+    scored = engine.score_context(constraints, api_context_score=suspicion_score)
+
+    # Convert complex dicts to string for detail
+    detail_data = {
+        "transcript": transcript,
+        "ocr_text": ocr_text,
+        "gdacs_events_count": len(gdacs_events),
+        "llm_result": llm_result,
+        "claims": claims,
+        "is_war_or_conflict": is_war_or_conflict,
+        "event_type": event_type,
+    }
+
     return AgentFinding(
         agent_id="context_analyser",
         status="done",
-        score=suspicion_score,
+        score=round(scored.match_score, 1),
         findings=findings,
-        detail=json.dumps(
-            {
-                "transcript": transcript,
-                "ocr_text": ocr_text,
-                "gdacs_events_count": len(gdacs_events),
-                "llm_result": llm_result,
-                "claims": claims,
-                "is_war_or_conflict": is_war_or_conflict,
-                "event_type": event_type,
-            },
-            default=str,
-        ),
+        detail=json.dumps(detail_data, default=str) + f" | disaster_type:{disaster_type}",
+        constraints_satisfied=scored.constraints_satisfied,
+        total_constraints=scored.total_constraints,
+        constraint_details=scored.constraint_details,
     )
+

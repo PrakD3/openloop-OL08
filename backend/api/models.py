@@ -5,27 +5,25 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-def to_camel(string: str) -> str:
-    """Convert snake_case to camelCase."""
-    components = string.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
-
-
-class VigilensBaseModel(BaseModel):
-    """Base model with camelCase aliases."""
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
-        from_attributes = True
-
-
-class AnalyzeRequest(VigilensBaseModel):
+class AnalyzeRequest(BaseModel):
     video_url: Optional[str] = None
     video_path: Optional[str] = None
     claimed_location: Optional[str] = None
 
 
-class AgentFindingResponse(VigilensBaseModel):
+class ModelScoreResponse(BaseModel):
+    model_name: str
+    authentic_pct: float
+    fake_pct: float
+    confidence: float
+
+
+class ConstraintResult(BaseModel):
+    name: str
+    passed: bool
+
+
+class AgentFindingResponse(BaseModel):
     agent_id: str
     agent_name: str
     status: Literal["idle", "running", "done", "error"]
@@ -33,23 +31,40 @@ class AgentFindingResponse(VigilensBaseModel):
     findings: List[str] = []
     detail: Optional[str] = None
     duration_ms: Optional[int] = None
+    constraints_satisfied: Optional[int] = None
+    total_constraints: Optional[int] = None
+    constraint_details: Dict[str, bool] = {}
+    model_scores: List[ModelScoreResponse] = []   # deepfake agent only
 
 
-class AnalyzeResponse(VigilensBaseModel):
+class SOSRegion(BaseModel):
+    lat: float
+    lng: float
+    radius_km: float
+    center_name: str
+    disaster_type: str
+    panic_index: int
+    color: str
+    sos_active: bool
+
+
+class AnalyzeResponse(BaseModel):
     job_id: str
     verdict: Literal["real", "misleading", "ai-generated", "unverified"]
     credibility_score: int = Field(ge=0, le=100)
     panic_index: int = Field(ge=0, le=10)
     summary: str
+    disaster_type: str = "unknown"
     source_origin: Optional[str] = None
     original_date: Optional[str] = None
     claimed_location: Optional[str] = None
     actual_location: Optional[str] = None
     key_flags: List[str] = []
     agents: List[AgentFindingResponse] = []
+    sos_region: Optional[SOSRegion] = None
 
 
-class JobStatusResponse(VigilensBaseModel):
+class JobStatusResponse(BaseModel):
     job_id: str
     status: Literal["queued", "processing", "done", "error"]
     progress: int = Field(ge=0, le=100)
@@ -57,7 +72,7 @@ class JobStatusResponse(VigilensBaseModel):
     error: Optional[str] = None
 
 
-class HealthResponse(VigilensBaseModel):
+class HealthResponse(BaseModel):
     status: str
     mode: str
     app_mode: str

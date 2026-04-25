@@ -5,14 +5,28 @@ from typing_extensions import TypedDict
 
 
 @dataclass
+class ModelScore:
+    """Per-model deepfake detection result."""
+    model_name: str
+    authentic_pct: float
+    fake_pct: float
+    confidence: float
+
+
+@dataclass
 class AgentFinding:
     agent_id: str
-    agent_name: str = ""
+    agent_name: str
     status: Literal["idle", "running", "done", "error"] = "idle"
     score: Optional[float] = None
     findings: List[str] = field(default_factory=list)
     detail: Optional[str] = None
     duration_ms: Optional[int] = None
+    # Custom ML scoring extras
+    constraints_satisfied: Optional[int] = None
+    total_constraints: Optional[int] = None
+    constraint_details: Dict[str, bool] = field(default_factory=dict)
+    model_scores: List[ModelScore] = field(default_factory=list)  # deepfake agent only
 
 
 class AgentState(TypedDict):
@@ -45,8 +59,6 @@ class AgentState(TypedDict):
     key_flags: List[str]
     error: Optional[str]
 
-    # Notification result
-    notification_result: Optional[dict]  # Output from notification_node
-
-    # War/conflict flag (from context analyser)
-    is_war_or_conflict: Optional[bool]
+    # New fields
+    disaster_type: Optional[str]
+    sos_region: Optional[Dict]   # populated by orchestrator when verdict='real'
