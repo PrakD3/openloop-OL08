@@ -77,10 +77,9 @@ fi
 
 if [ ! -f "frontend/.env.local" ]; then
   cp frontend/.env.local.example frontend/.env.local
-  # Override for online mode
-  sed -i 's/NEXT_PUBLIC_INFERENCE_MODE=.*/NEXT_PUBLIC_INFERENCE_MODE=online/' frontend/.env.local
+  # Set app mode to real
   sed -i 's/NEXT_PUBLIC_APP_MODE=.*/NEXT_PUBLIC_APP_MODE=real/' frontend/.env.local
-  echo "  ✓ Created frontend/.env.local (online mode)"
+  echo "  ✓ Created frontend/.env.local"
 else
   echo "  ✓ frontend/.env.local already exists"
 fi

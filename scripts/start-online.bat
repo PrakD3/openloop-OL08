@@ -63,9 +63,9 @@ if not exist "backend\.env" (
 
 if not exist "frontend\.env.local" (
     copy "frontend\.env.local.example" "frontend\.env.local" >nul
-    :: Set online mode
-    powershell -Command "(Get-Content 'frontend\.env.local') -replace 'NEXT_PUBLIC_INFERENCE_MODE=.*','NEXT_PUBLIC_INFERENCE_MODE=online' -replace 'NEXT_PUBLIC_APP_MODE=.*','NEXT_PUBLIC_APP_MODE=real' | Set-Content 'frontend\.env.local'"
-    echo   Created frontend\.env.local (online mode)
+    :: Set app mode to real
+    powershell -Command "(Get-Content 'frontend\.env.local') -replace 'NEXT_PUBLIC_APP_MODE=.*','NEXT_PUBLIC_APP_MODE=real' | Set-Content 'frontend\.env.local'"
+    echo   Created frontend\.env.local
 ) else (
     echo   frontend\.env.local already exists
 )

@@ -9,7 +9,7 @@ modifier and small deterministic noise (seeded from job_id) give
 differentiated, realistic output rather than hard-coded constants.
 
 Per-model breakdown is produced for the DeepFake Detector so the frontend
-can show CrossEfficientViT / UniversalFakeDetect / Hive AI individually.
+can show Vertex AI / Groq Vision individually.
 """
 
 from __future__ import annotations
@@ -186,7 +186,7 @@ class DisasterScoringEngine:
     def score_deepfake(
         self,
         constraint_values: Dict[str, bool],
-        api_fake_score: Optional[float] = None,   # raw % from Hive / DeepSafe (0-100)
+        api_fake_score: Optional[float] = None,   # raw % from cloud detector (0-100)
     ) -> DeepfakeScoringResult:
         """
         Returns fake_score (0-100).  Lower = more authentic.
@@ -392,28 +392,19 @@ class DisasterScoringEngine:
 
         cev_fake  = self._clamp(final_fake + n1 * 3.0)
         ufd_fake  = self._clamp(final_fake + n2 * 4.5)
-        hive_fake = self._clamp(
-            float(api_score) if api_score is not None else final_fake + n3 * 2.5
-        )
 
         return [
             ModelScore(
-                model_name="CrossEfficientViT",
+                model_name="Vertex AI (Gemini)",
                 authentic_pct=round(100 - cev_fake, 1),
                 fake_pct=round(cev_fake, 1),
                 confidence=round(self._clamp(85 + n1 * 8), 1),
             ),
             ModelScore(
-                model_name="UniversalFakeDetect",
+                model_name="Groq Vision (Llama)",
                 authentic_pct=round(100 - ufd_fake, 1),
                 fake_pct=round(ufd_fake, 1),
                 confidence=round(self._clamp(80 + n2 * 10), 1),
-            ),
-            ModelScore(
-                model_name="Hive AI",
-                authentic_pct=round(100 - hive_fake, 1),
-                fake_pct=round(hive_fake, 1),
-                confidence=round(self._clamp(88 + n3 * 6), 1),
             ),
         ]
 

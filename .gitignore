@@ -80,3 +80,8 @@ frontend/next-env.d.ts
 skills/
 skills-lock.json
 gcp-key.json
+
+# Scratch and temp files
+scratch/
+*_files.txt
+docker-compose*.yml

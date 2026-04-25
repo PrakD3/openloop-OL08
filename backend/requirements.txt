@@ -1,5 +1,5 @@
 # Vigilens — Backend Requirements (Cloud Only)
-# Uses cloud APIs (Groq, Hive, OpenAI) for all AI inference.
+# Uses cloud APIs (Groq, Vertex AI, OpenAI) for all AI inference.
 
 # Core
 fastapi==0.115.0

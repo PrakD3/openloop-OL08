@@ -15,8 +15,8 @@ export default function HowItWorksPage() {
       step: 2,
       icon: Zap,
       name: 'DeepFake Detector',
-      desc: 'CrossEfficientViT model analyses each keyframe for GAN artifacts and AI generation signatures',
-      tech: ['Hive AI', 'DeepSafe', 'CrossEfficientViT'],
+      desc: 'Analyses keyframes using Vertex AI and Groq Vision for synthetic artifacts and AI generation signatures',
+      tech: ['Vertex AI', 'Groq Vision'],
     },
     {
       step: 3,
@@ -30,7 +30,7 @@ export default function HowItWorksPage() {
       icon: Globe,
       name: 'Context Analyser',
       desc: 'Whisper transcribes audio, EasyOCR reads on-screen text, vision LLM verifies location and temporal context',
-      tech: ['Whisper', 'EasyOCR', 'Groq', 'Ollama'],
+      tech: ['Whisper', 'EasyOCR', 'Groq', 'Gemini'],
     },
     {
       step: 5,
@@ -82,14 +82,14 @@ FastAPI Backend [CORE-LOGIC]
       │                  │                  │
       ▼                  ▼                  ▼
 [DEEPFAKE DETECTOR] [SOURCE HUNTER]    [CONTEXT ANALYSER]
- Hive AI / DeepSafe  Google Vision      Whisper + EasyOCR
- CrossEfficientViT   TinEye / pHash     Vision LLM
+ Vertex AI / Groq   Google Vision      Whisper + EasyOCR
+ Vision LLM         TinEye / pHash     Vision LLM
       │                  │                  │
       └──────────────────┼──────────────────┘
                         │
                         ▼
                 [ORCHESTRATOR]
-                Groq / Ollama LLM
+                Groq / Gemini LLM
                 LangSmith Tracing
                         │
                         ▼
@@ -141,30 +141,10 @@ FastAPI Backend [CORE-LOGIC]
             <CardContent className="p-6 space-y-3">
               {[
                 'LLM: Groq API (llama-3.3-70b)',
-                'DeepFake: Hive AI API',
+                'DeepFake: Vertex AI / Groq Vision',
                 'Transcription: OpenAI Whisper API',
                 'Reverse Search: Google Vision + TinEye',
-                'Requires API keys — see .env.local.example',
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 font-black text-sm uppercase tracking-tight">
-                  <div className="h-2 w-2 bg-foreground" /> {item}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="border-4 border-foreground shadow-bk bg-secondary/20">
-            <CardHeader className="border-b-4 border-foreground">
-              <CardTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
-                <Cpu className="h-6 w-6" /> Offline Mode
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-3">
-              {[
-                'LLM: Ollama (llama3.3 local)',
-                'DeepFake: DeepSafe Docker',
-                'Transcription: Local Whisper model',
-                'OCR: EasyOCR (always local)',
-                'Requires 16GB RAM + NVIDIA GPU',
+                'Requires API keys — see .env.example',
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 font-black text-sm uppercase tracking-tight">
                   <div className="h-2 w-2 bg-foreground" /> {item}

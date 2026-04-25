@@ -1,5 +1,5 @@
 # Vigilens — Full Project Build Prompt for AI Agent
-## Version: 2.0 | Stack: Next.js 16 · Python FastAPI · LangGraph · Groq/Ollama · BoldKit + shadcn/ui
+## Version: 2.0 | Stack: Next.js 16 · Python FastAPI · LangGraph · Groq · BoldKit + shadcn/ui
 
 ---
 
@@ -27,7 +27,7 @@ git commit -m "chore: initial Next.js project scaffold"
 git commit -m "chore: add shadcn/ui + boldkit theme"
 git commit -m "chore: configure biome linter and formatter"
 git commit -m "chore: add CI/CD GitHub Actions pipeline"
-git commit -m "feat: add environment config with online/offline toggle"
+git commit -m "feat: add environment config"
 git commit -m "feat: add layout, navbar, footer with boldkit components"
 git commit -m "feat: add home page with video submission"
 git commit -m "feat: add analysis page with agent progress UI"
@@ -38,12 +38,11 @@ git commit -m "feat: add i18n with react-i18next + Groq dynamic translation"
 git commit -m "feat: add demo/real mode toggle"
 git commit -m "feat: Python backend scaffold with FastAPI"
 git commit -m "feat: add LangGraph agent pipeline"
-git commit -m "feat: add DeepFake detector agent (online + local)"
+git commit -m "feat: add DeepFake detector agent (online)"
 git commit -m "feat: add Source Hunter agent"
 git commit -m "feat: add Context Analyser agent"
 git commit -m "feat: add Orchestrator node with LangSmith tracing"
 git commit -m "feat: wire Next.js API routes to Python backend"
-git commit -m "chore: add Docker setup for local AI stack"
 git commit -m "docs: add README with full setup guide"
 ```
 
@@ -89,7 +88,7 @@ vigilens/
 │   │   │   ├── layout/
 │   │   │   │   ├── Navbar.tsx
 │   │   │   │   ├── Footer.tsx
-│   │   │   │   └── ModeToggle.tsx    # Online/Offline + Demo/Real toggles
+│   │   │   │   └── ModeToggle.tsx    # Demo/Real toggle
 │   │   │   ├── analysis/
 │   │   │   │   ├── AgentPanel.tsx
 │   │   │   │   ├── VerdictCard.tsx
@@ -109,11 +108,11 @@ vigilens/
 │   │   │       └── es.json
 │   │   ├── lib/
 │   │   │   ├── utils.ts              # cn() and shared helpers
-│   │   │   ├── config.ts             # reads env vars, exports MODE config
+│   │   │   ├── config.ts             # reads env vars, exports appMode config
 │   │   │   └── demoData.ts           # all demo/mock data lives here
 │   │   ├── hooks/
 │   │   │   ├── useAnalysis.ts
-│   │   │   └── useMode.ts            # reads NEXT_PUBLIC_MODE
+│   │   │   └── useMode.ts            # reads NEXT_PUBLIC_APP_MODE
 │   │   └── types/
 │   │       └── index.ts
 │   ├── components.json               # shadcn + boldkit registry
@@ -137,10 +136,9 @@ vigilens/
 │   │       ├── __init__.py
 │   │       ├── ffmpeg_tools.py       # Frame extraction, metadata
 │   │       ├── ocr_tools.py          # EasyOCR / Tesseract
-│   │       ├── whisper_tools.py      # Local or API transcription
+│   │       ├── whisper_tools.py      # API transcription
 │   │       ├── reverse_search.py     # Google Vision, TinEye, perceptual hash
-│   │       ├── metadata_db.py        # EXIF, GPS, encoding fingerprint
-│   │       └── deepsafe_client.py    # Local DeepSafe Docker client
+│   │       └── metadata_db.py        # EXIF, GPS, encoding fingerprint
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── main.py                   # FastAPI app entry point
@@ -158,12 +156,10 @@ vigilens/
 │   │   └── conftest.py
 │   ├── docker/
 │   │   ├── Dockerfile.backend
-│   │   └── Dockerfile.deepsafe       # DeepSafe local detection container
 │   ├── pyproject.toml                # uv/poetry project file
 │   ├── requirements.txt
 │   └── .env.example
-├── docker-compose.yml                # Full local stack
-├── docker-compose.online.yml         # Online-mode stack (no local models)
+├── .gitignore
 ├── langgraph.json                    # LangGraph Studio config
 └── README.md
 ```
@@ -391,7 +387,7 @@ const nextConfig = {
 
 ---
 
-## SECTION 4 — ENVIRONMENT CONFIGURATION (ONLINE/OFFLINE TOGGLE)
+## SECTION 4 — ENVIRONMENT CONFIGURATION
 
 ### 4.1 `.env.local.example` (frontend)
 
@@ -400,12 +396,6 @@ const nextConfig = {
 # Vigilens Environment Configuration
 # Copy to .env.local and fill in your values
 # ============================================================
-
-# ── MODE CONTROL ─────────────────────────────────────────────
-# INFERENCE_MODE: "online" | "offline"
-#   online  → Uses Groq API for LLM, Hive AI for deepfake, Whisper API for transcription
-#   offline → Uses Ollama (local LLM), DeepSafe (local Docker), local Whisper model
-NEXT_PUBLIC_INFERENCE_MODE=online
 
 # APP_MODE: "demo" | "real"
 #   demo → Uses sample YouTube/Instagram videos and mock agent results
@@ -416,77 +406,24 @@ NEXT_PUBLIC_APP_MODE=demo
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
 
 # ── ONLINE MODE API KEYS ──────────────────────────────────────
-# Groq — Free tier: https://console.groq.com
-# Used for: Orchestrator LLM, translation, context analysis
 GROQ_API_KEY=
-
-# Hive AI — Free tier (100 req/day): https://thehive.ai
-# Used for: DeepFake detection (online mode)
 HIVE_API_KEY=
-
-# LangSmith — Free tier: https://smith.langchain.com
-# Used for: Agent tracing, observability, debugging
 LANGSMITH_API_KEY=
-LANGSMITH_PROJECT=vigilens
-LANGSMITH_TRACING_V2=true
-
-# Together AI — Optional alternative LLM: https://api.together.xyz
-TOGETHER_API_KEY=
-
-# ── ONLINE SOURCE HUNTING ────────────────────────────────────
-# Google Vision API (for reverse image search of keyframes)
-# Get from: https://console.cloud.google.com/apis/library/vision.googleapis.com
 GOOGLE_VISION_API_KEY=
-
-# TinEye API (for reverse image/video search)
-# Get from: https://services.tineye.com/TinEyeAPI
 TINEYE_API_KEY=
-
-# YouTube Data API v3 (for fetching video metadata)
-# Get from: https://console.cloud.google.com/apis/library/youtube.googleapis.com
 YOUTUBE_API_KEY=
-
-# Shodan API (for IP/infrastructure metadata on video sources)
-# Get from: https://account.shodan.io
-SHODAN_API_KEY=
-
-# ── OFFLINE MODE CONFIG ───────────────────────────────────────
-# Ollama base URL (default: http://localhost:11434)
-OLLAMA_BASE_URL=http://localhost:11434
-# Ollama model for orchestrator (recommend: llama3.3 or mistral)
-OLLAMA_ORCHESTRATOR_MODEL=llama3.3
-# Ollama vision model for frame analysis
-OLLAMA_VISION_MODEL=llava:13b
-
-# DeepSafe local API (Docker container)
-DEEPSAFE_URL=http://localhost:8001
-
-# Local Whisper model size: tiny | base | small | medium | large
-WHISPER_MODEL_SIZE=medium
-
-# ── DATABASE (optional for community features) ────────────────
-# Supabase for community posts, votes, bulletins
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 ### 4.2 Backend `.env.example`
 
 ```env
 # ── MODE ─────────────────────────────────────────────────────
-INFERENCE_MODE=online   # online | offline
 APP_MODE=demo           # demo | real
 
 # ── ONLINE LLM ───────────────────────────────────────────────
 GROQ_API_KEY=
 GROQ_ORCHESTRATOR_MODEL=llama-3.3-70b-versatile
 GROQ_FAST_MODEL=llama-3.1-8b-instant
-
-# ── OFFLINE LLM ──────────────────────────────────────────────
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_ORCHESTRATOR_MODEL=llama3.3
-OLLAMA_VISION_MODEL=llava:13b
 
 # ── LANGSMITH TRACING ────────────────────────────────────────
 LANGSMITH_API_KEY=
@@ -495,25 +432,15 @@ LANGSMITH_TRACING_V2=true
 
 # ── DEEPFAKE DETECTION ───────────────────────────────────────
 HIVE_API_KEY=           # Online mode
-DEEPSAFE_URL=http://localhost:8001   # Offline mode
 
 # ── WHISPER TRANSCRIPTION ────────────────────────────────────
-WHISPER_USE_API=true    # true = OpenAI Whisper API, false = local model
-OPENAI_API_KEY=         # Only needed if WHISPER_USE_API=true
-WHISPER_MODEL_SIZE=medium  # For local: tiny|base|small|medium|large
+WHISPER_USE_API=true    # true = OpenAI Whisper API
+OPENAI_API_KEY=         
 
 # ── SOURCE HUNTING ────────────────────────────────────────────
 GOOGLE_VISION_API_KEY=
 TINEYE_API_KEY=
 YOUTUBE_API_KEY=
-
-# ── METADATA DATABASES ────────────────────────────────────────
-# EXIF + GPS extraction is always local (ExifTool)
-# No API key needed for basic metadata
-
-# ── SERVER ────────────────────────────────────────────────────
-HOST=0.0.0.0
-PORT=8000
 ```
 
 ### 4.3 Mode Config Module (`src/lib/config.ts`)
@@ -545,7 +472,6 @@ Add a visible toggle in the Navbar that reads from `config.appMode`. In demo mod
 The toggle must:
 - Show current mode in the UI (badge or pill)
 - Allow switching between demo/real by updating a client-side state (no page reload needed for demo data swap)
-- Show a warning banner if `NEXT_PUBLIC_APP_MODE=real` and `NEXT_PUBLIC_INFERENCE_MODE=offline` that says "Offline mode — local models required"
 - Be built with BoldKit `@boldkit/badge` and `@boldkit/button` components
 
 ---

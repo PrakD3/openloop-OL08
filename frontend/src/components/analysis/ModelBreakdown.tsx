@@ -7,9 +7,8 @@ interface ModelBreakdownProps {
 }
 
 const MODEL_ICONS: Record<string, string> = {
-  CrossEfficientViT: '🔬',
-  UniversalFakeDetect: '🧪',
-  'Hive AI': '🐝',
+  'Vertex AI (Gemini)': '♊',
+  'Groq Vision (Llama)': '🦙',
 };
 
 export function ModelBreakdown({ modelScores }: ModelBreakdownProps) {

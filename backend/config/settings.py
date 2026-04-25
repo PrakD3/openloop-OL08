@@ -32,17 +32,6 @@ class Settings(BaseSettings):
     langsmith_project: str = "vigilens"
     langsmith_tracing_v2: str = "true"
 
-    # ── Deepfake detection ────────────────────────────────────────────────────
-    hive_api_key: str = ""
-    deepsafe_enabled: bool = False
-
-    # ── Whisper (legacy / local fallback) ─────────────────────────────────────
-    # whisper_use_groq=true takes priority over both of these.
-    # whisper_use_api=true + openai_api_key → OpenAI Whisper API
-    # otherwise                              → local openai-whisper package
-    whisper_use_api: bool = True
-    openai_api_key: str = ""
-    whisper_model_size: str = "medium"
 
     # ── Source hunting ────────────────────────────────────────────────────────
     google_vision_api_key: str = ""

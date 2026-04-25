@@ -1,7 +1,7 @@
 """
 DeepFake Detector Agent Node
 =============================
-Online mode:  Hive AI API (100 req/day free) + Groq Vision
+Online mode:  Vertex AI (Gemini) + Groq Vision
 Fallback:     Pixel-variance heuristic (always available, ~70% accuracy)
 
 Flow:
@@ -24,42 +24,6 @@ from langsmith import traceable
 from agents.state import AgentFinding, AgentState
 from config.settings import get_llm, is_deprecated_groq_model, settings
 
-# ── Hive AI (Primary Online) ──────────────────────────────────────────────────
-
-async def detect_deepfake_hive(frame_path: str) -> Optional[dict]:
-    """
-    Call Hive AI's Deepfake detection API.
-    Requires HIVE_API_KEY.
-    """
-    if not settings.hive_api_key:
-        return None
-
-    try:
-        async with httpx.AsyncClient() as client:
-            with open(frame_path, "rb") as f:
-                files = {"media": f}
-                response = await client.post(
-                    "https://api.thehive.ai/api/v2/predict/deepfake",
-                    headers={"Authorization": f"token {settings.hive_api_key}"},
-                    files=files,
-                    timeout=20.0
-                )
-            response.raise_for_status()
-            data = response.json()
-            # Hive returns list of results
-            res = data["status"][0]["response"]["output"][0]
-            # classes are like: {'deepfake': 0.99, 'not_deepfake': 0.01}
-            score = 0.0
-            findings = []
-            for cls in res.get("classes", []):
-                if cls["class"] == "deepfake":
-                    score = cls["score"]
-                    if score > 0.5:
-                        findings.append(f"Hive AI detected synthetic artifacts (confidence: {score:.1%})")
-            return {"confidence_score": score, "findings": findings}
-    except Exception as e:
-        print(f"[DeepFake/Hive] Failed: {e}")
-        return None
 
 async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
     """Run analysis through Vertex AI Gemini."""
@@ -214,20 +178,6 @@ async def deepfake_detector_node(state: AgentState) -> AgentFinding:
     """Main node entry point (Online Only)."""
     print(f"\n[AGENT] deepfake_detector: Started cloud analysis...")
     
-    # 1. Hive AI (if key)
-    if settings.hive_api_key:
-        kf = state.get("keyframes", [])
-        if kf:
-            res = await detect_deepfake_hive(kf[0])
-            if res:
-                score = round(res["confidence_score"] * 100)
-                return AgentFinding(
-                    agent_id="deepfake_detector",
-                    status="done",
-                    score=score,
-                    findings=_build_findings(score, score, res["findings"], source="Hive AI"),
-                    detail=json.dumps({"source": "hive_ai", "score": score})
-                )
 
     # 2. Vertex AI (if credits)
     if settings.google_cloud_project:
