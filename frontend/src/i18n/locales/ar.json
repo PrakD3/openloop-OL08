@@ -1,0 +1,68 @@
+{
+  "nav": {
+    "home": "الرئيسية",
+    "analysis": "التحليل",
+    "incidents": "الحوادث",
+    "bulletin": "النشرة",
+    "howItWorks": "كيف يعمل"
+  },
+  "home": {
+    "hero": "كشف المعلومات المضللة في مقاطع فيديو الكوارث",
+    "subtitle": "تحليل مدعوم بالذكاء الاصطناعي للتحقق من لقطات الكوارث في الوقت الفعلي",
+    "submitLabel": "أدخل رابط الفيديو للتحليل",
+    "submitPlaceholder": "https://youtube.com/watch?v=...",
+    "analyseButton": "تحليل الفيديو",
+    "demoMode": "وضع العرض",
+    "realMode": "الوضع الحقيقي",
+    "onlineMode": "متصل",
+    "offlineMode": "غير متصل"
+  },
+  "analysis": {
+    "title": "التحليل جارٍ",
+    "verdict": "الحكم",
+    "credibilityScore": "درجة المصداقية",
+    "panicIndex": "مؤشر الهلع",
+    "summary": "الملخص",
+    "agents": "وكلاء الذكاء الاصطناعي",
+    "keyFlags": "العلامات الرئيسية",
+    "sourceOrigin": "مصدر المنشأ",
+    "shareResult": "مشاركة النتيجة"
+  },
+  "verdict": {
+    "real": "حقيقي",
+    "misleading": "مضلل",
+    "ai-generated": "مولد بالذكاء الاصطناعي",
+    "unverified": "غير موثق"
+  },
+  "agents": {
+    "deepfake-detector": "كاشف التزوير العميق",
+    "source-hunter": "صائد المصادر",
+    "context-analyser": "محلل السياق"
+  },
+  "incidents": {
+    "title": "الحوادث النشطة",
+    "filter": "تصفية حسب الحكم",
+    "misinfoRate": "معدل المعلومات المضللة",
+    "videoCount": "مقاطع الفيديو المحللة"
+  },
+  "bulletin": {
+    "title": "نشرة الحوادث",
+    "confirmed": "مؤكد",
+    "debunked": "مفنَّد",
+    "unverified": "غير موثق",
+    "official": "رسمي"
+  },
+  "howItWorks": {
+    "title": "كيف يعمل Vigilens",
+    "subtitle": "خط أنابيب ذكاء اصطناعي ثلاثي المراحل يحلل مصداقية مقاطع فيديو الكوارث"
+  },
+  "common": {
+    "loading": "جارٍ التحميل...",
+    "error": "خطأ",
+    "retry": "إعادة المحاولة",
+    "share": "مشاركة",
+    "back": "رجوع",
+    "seeMore": "عرض المزيد",
+    "votes": "أصوات"
+  }
+}

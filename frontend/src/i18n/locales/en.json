@@ -1,0 +1,68 @@
+{
+  "nav": {
+    "home": "Home",
+    "analysis": "Analysis",
+    "incidents": "Incidents",
+    "bulletin": "Bulletin",
+    "howItWorks": "How It Works"
+  },
+  "home": {
+    "hero": "Disaster Video Misinformation Detection",
+    "subtitle": "AI-powered analysis to verify disaster footage in real time",
+    "submitLabel": "Enter video URL to analyse",
+    "submitPlaceholder": "https://youtube.com/watch?v=...",
+    "analyseButton": "Analyse Video",
+    "demoMode": "Demo Mode",
+    "realMode": "Real Mode",
+    "onlineMode": "Online",
+    "offlineMode": "Offline"
+  },
+  "analysis": {
+    "title": "Analysis in Progress",
+    "verdict": "Verdict",
+    "credibilityScore": "Credibility Score",
+    "panicIndex": "Panic Index",
+    "summary": "Summary",
+    "agents": "AI Agents",
+    "keyFlags": "Key Flags",
+    "sourceOrigin": "Source Origin",
+    "shareResult": "Share Result"
+  },
+  "verdict": {
+    "real": "REAL",
+    "misleading": "MISLEADING",
+    "ai-generated": "AI GENERATED",
+    "unverified": "UNVERIFIED"
+  },
+  "agents": {
+    "deepfake-detector": "DeepFake Detector",
+    "source-hunter": "Source Hunter",
+    "context-analyser": "Context Analyser"
+  },
+  "incidents": {
+    "title": "Active Incidents",
+    "filter": "Filter by verdict",
+    "misinfoRate": "Misinfo Rate",
+    "videoCount": "Videos Analysed"
+  },
+  "bulletin": {
+    "title": "Incident Bulletin",
+    "confirmed": "Confirmed",
+    "debunked": "Debunked",
+    "unverified": "Unverified",
+    "official": "Official"
+  },
+  "howItWorks": {
+    "title": "How Vigilens Works",
+    "subtitle": "A three-stage AI pipeline that analyses disaster videos for authenticity"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "share": "Share",
+    "back": "Back",
+    "seeMore": "See More",
+    "votes": "votes"
+  }
+}

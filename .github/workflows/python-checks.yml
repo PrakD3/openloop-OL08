@@ -1,0 +1,42 @@
+name: Python Checks
+
+on:
+  push:
+    paths: ['backend/**']
+  pull_request:
+    paths: ['backend/**']
+
+jobs:
+  python-quality:
+    name: Python — Lint, Type Check, Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Mypy type check
+        run: mypy . --ignore-missing-imports
+        continue-on-error: true
+
+      - name: Pytest
+        run: pytest tests/ -v --tb=short
+        env:
+          INFERENCE_MODE: online
+          APP_MODE: demo

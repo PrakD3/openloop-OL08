@@ -1,0 +1,68 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "analysis": "Análisis",
+    "incidents": "Incidentes",
+    "bulletin": "Boletín",
+    "howItWorks": "Cómo Funciona"
+  },
+  "home": {
+    "hero": "Detección de Desinformación en Videos de Desastres",
+    "subtitle": "Análisis impulsado por IA para verificar imágenes de desastres en tiempo real",
+    "submitLabel": "Ingrese la URL del video para analizar",
+    "submitPlaceholder": "https://youtube.com/watch?v=...",
+    "analyseButton": "Analizar Video",
+    "demoMode": "Modo Demo",
+    "realMode": "Modo Real",
+    "onlineMode": "En línea",
+    "offlineMode": "Sin conexión"
+  },
+  "analysis": {
+    "title": "Análisis en Progreso",
+    "verdict": "Veredicto",
+    "credibilityScore": "Puntuación de Credibilidad",
+    "panicIndex": "Índice de Pánico",
+    "summary": "Resumen",
+    "agents": "Agentes de IA",
+    "keyFlags": "Indicadores Clave",
+    "sourceOrigin": "Origen de la Fuente",
+    "shareResult": "Compartir Resultado"
+  },
+  "verdict": {
+    "real": "REAL",
+    "misleading": "ENGAÑOSO",
+    "ai-generated": "GENERADO POR IA",
+    "unverified": "NO VERIFICADO"
+  },
+  "agents": {
+    "deepfake-detector": "Detector de Deepfake",
+    "source-hunter": "Cazador de Fuentes",
+    "context-analyser": "Analizador de Contexto"
+  },
+  "incidents": {
+    "title": "Incidentes Activos",
+    "filter": "Filtrar por veredicto",
+    "misinfoRate": "Tasa de Desinformación",
+    "videoCount": "Videos Analizados"
+  },
+  "bulletin": {
+    "title": "Boletín de Incidentes",
+    "confirmed": "Confirmado",
+    "debunked": "Desmentido",
+    "unverified": "No Verificado",
+    "official": "Oficial"
+  },
+  "howItWorks": {
+    "title": "Cómo Funciona Vigilens",
+    "subtitle": "Un pipeline de IA de tres etapas que analiza la autenticidad de videos de desastres"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "retry": "Reintentar",
+    "share": "Compartir",
+    "back": "Volver",
+    "seeMore": "Ver Más",
+    "votes": "votos"
+  }
+}

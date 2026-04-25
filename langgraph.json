@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "vigilens": "./backend/agents/graph.py:graph"
+  },
+  "env": ".env"
+}

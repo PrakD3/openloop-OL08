@@ -1,0 +1,68 @@
+{
+  "nav": {
+    "home": "होम",
+    "analysis": "विश्लेषण",
+    "incidents": "घटनाएँ",
+    "bulletin": "बुलेटिन",
+    "howItWorks": "यह कैसे काम करता है"
+  },
+  "home": {
+    "hero": "आपदा वीडियो गलत सूचना पहचान",
+    "subtitle": "रियल-टाइम में आपदा वीडियो को सत्यापित करने के लिए AI-संचालित विश्लेषण",
+    "submitLabel": "विश्लेषण के लिए वीडियो URL दर्ज करें",
+    "submitPlaceholder": "https://youtube.com/watch?v=...",
+    "analyseButton": "वीडियो विश्लेषण करें",
+    "demoMode": "डेमो मोड",
+    "realMode": "रियल मोड",
+    "onlineMode": "ऑनलाइन",
+    "offlineMode": "ऑफलाइन"
+  },
+  "analysis": {
+    "title": "विश्लेषण जारी है",
+    "verdict": "निर्णय",
+    "credibilityScore": "विश्वसनीयता स्कोर",
+    "panicIndex": "घबराहट सूचकांक",
+    "summary": "सारांश",
+    "agents": "AI एजेंट",
+    "keyFlags": "प्रमुख संकेत",
+    "sourceOrigin": "स्रोत उत्पत्ति",
+    "shareResult": "परिणाम साझा करें"
+  },
+  "verdict": {
+    "real": "वास्तविक",
+    "misleading": "भ्रामक",
+    "ai-generated": "AI जनित",
+    "unverified": "असत्यापित"
+  },
+  "agents": {
+    "deepfake-detector": "डीपफेक डिटेक्टर",
+    "source-hunter": "स्रोत हंटर",
+    "context-analyser": "संदर्भ विश्लेषक"
+  },
+  "incidents": {
+    "title": "सक्रिय घटनाएँ",
+    "filter": "निर्णय से फ़िल्टर करें",
+    "misinfoRate": "गलत सूचना दर",
+    "videoCount": "विश्लेषित वीडियो"
+  },
+  "bulletin": {
+    "title": "घटना बुलेटिन",
+    "confirmed": "पुष्टि",
+    "debunked": "खंडित",
+    "unverified": "असत्यापित",
+    "official": "आधिकारिक"
+  },
+  "howItWorks": {
+    "title": "Vigilens कैसे काम करता है",
+    "subtitle": "तीन-चरण AI पाइपलाइन जो आपदा वीडियो की प्रामाणिकता का विश्लेषण करती है"
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "error": "त्रुटि",
+    "retry": "पुनः प्रयास",
+    "share": "साझा करें",
+    "back": "वापस",
+    "seeMore": "और देखें",
+    "votes": "वोट"
+  }
+}
