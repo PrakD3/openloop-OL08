@@ -28,7 +28,7 @@
         "noNonNullAssertion": "warn"
       },
       "suspicious": {
-        "noConsoleLog": "warn"
+        "noConsole": "warn"
       }
     }
   },
@@ -44,7 +44,7 @@
       "include": ["*.test.ts", "*.test.tsx", "*.spec.ts"],
       "linter": {
         "rules": {
-          "suspicious": { "noConsoleLog": "off" }
+          "suspicious": { "noConsole": "off" }
         }
       }
     }
