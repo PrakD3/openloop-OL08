@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from config.settings import settings
 from api.models import HealthResponse
+from config.settings import settings
 
 router = APIRouter()
 

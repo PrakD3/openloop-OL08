@@ -1,13 +1,13 @@
-import logging
-import time
-import json
 import asyncio
 import base64
-from typing import Dict, List, Optional
-from PIL import Image
 import io
+import json
+import logging
+import time
 
-from agents.state import AgentState, AgentFinding
+from PIL import Image
+
+from agents.state import AgentFinding, AgentState
 from config.settings import get_llm, settings
 
 logger = logging.getLogger(__name__)
@@ -50,25 +50,25 @@ class GeolocationHunter:
             logger.error(f"Geolocation Hunter: LLM init failed: {e}. Falling back to Groq...")
             self.llm = get_llm(model=settings.groq_vision_model)
             self.mode = "groq"
-        
+
     def _encode_image(self, image_path: str) -> str:
         # Optimization: Resize image to save tokens and avoid 429
         img = Image.open(image_path)
         # Convert to RGB if necessary (to avoid issues with PNG transparency)
         if img.mode != "RGB":
             img = img.convert("RGB")
-        
+
         # Max dimension 768px (standard for vision models)
         img.thumbnail((768, 768))
-        
+
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG", quality=85)
         return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-    async def run(self, state: AgentState) -> Dict:
+    async def run(self, state: AgentState) -> dict:
         logger.info("Geolocation Hunter: Starting analysis")
         start_time = time.time()
-        
+
         keyframes = state.get("keyframes", [])
         if not keyframes:
             return {
@@ -82,20 +82,20 @@ class GeolocationHunter:
 
         # Analyze the first few keyframes (usually best for landscape/context)
         # In a real app, we might pick keyframes with most 'entropy' or clarity.
-        target_frames = keyframes[:2] 
-        
+        target_frames = keyframes[:2]
+
         all_findings = []
         best_location = None
-        
+
         try:
             # We use the vision model to analyze the frames
             # Using ChatGroq via LangChain
             from langchain_core.messages import HumanMessage
-            
+
             content = [
                 {"type": "text", "text": GEOLOCATION_PROMPT}
             ]
-            
+
             for frame_path in target_frames:
                 base64_image = self._encode_image(frame_path)
                 if self.mode == "gemini":
@@ -113,7 +113,7 @@ class GeolocationHunter:
             # Call the LLM
             message = HumanMessage(content=content)
             response = await asyncio.wait_for(self.llm.ainvoke([message]), timeout=60.0)
-            
+
             # Parse JSON response
             # Sometimes LLMs wrap in markdown blocks, we strip them.
             raw_text = response.content.strip()
@@ -121,20 +121,20 @@ class GeolocationHunter:
                 raw_text = raw_text.split("```json")[1].split("```")[0].strip()
             elif "```" in raw_text:
                 raw_text = raw_text.split("```")[1].strip()
-                
+
             data = json.loads(raw_text)
-            
+
             interpretation = data.get("interpretation", "No interpretation provided.")
             locations = data.get("locations", [])
-            
+
             if locations:
                 best_location = locations[0]
                 loc_str = f"{best_location.get('city')}, {best_location.get('country')}"
                 all_findings.append(f"Predicted Location: {loc_str}")
                 all_findings.append(f"Confidence: {best_location.get('confidence')}")
-                
+
             duration = int((time.time() - start_time) * 1000)
-            
+
             finding = AgentFinding(
                 agent_id="geolocation_hunter",
                 agent_name="Geo Hunter",
@@ -143,7 +143,7 @@ class GeolocationHunter:
                 detail=interpretation,
                 duration_ms=duration
             )
-            
+
             return {
                 "geolocation_result": finding,
                 "actual_location": f"{best_location.get('city')}, {best_location.get('state')}, {best_location.get('country')}" if best_location else "Unknown",
@@ -163,6 +163,6 @@ class GeolocationHunter:
                 )
             }
 
-async def geolocation_node(state: AgentState) -> Dict:
+async def geolocation_node(state: AgentState) -> dict:
     hunter = GeolocationHunter()
     return await hunter.run(state)

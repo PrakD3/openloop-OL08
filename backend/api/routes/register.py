@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 from notifications.user_registry import register_user
 
 router = APIRouter()

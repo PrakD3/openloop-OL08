@@ -12,17 +12,16 @@ Flow:
 
 import asyncio
 import base64
+import io
 import json
 import statistics
-import io
-import httpx
+
 import numpy as np
-from typing import Optional, List
-from PIL import Image
 from langsmith import traceable
+from PIL import Image
 
 from agents.state import AgentFinding, AgentState
-from config.settings import get_llm, is_deprecated_groq_model, settings
+from config.settings import get_llm, settings
 
 
 async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
@@ -31,13 +30,12 @@ async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
     if not keyframes or not settings.google_cloud_project:
         return await _heuristic_detect(state)
 
-    target_frames = keyframes[:2] 
-    
+    target_frames = keyframes[:2]
+
     print(f"[DeepFake] Using Vertex AI ({settings.gemini_model})...")
-    
+
     valid_results = []
     try:
-        import os
 
         llm = get_llm(model=settings.gemini_model)
 
@@ -48,13 +46,13 @@ async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
                 if img.mode != "RGB":
                     img = img.convert("RGB")
                 img.thumbnail((1024, 1024))
-                
+
                 buffer = io.BytesIO()
                 img.save(buffer, format="JPEG", quality=85)
                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-                
+
                 from langchain_core.messages import HumanMessage
-                
+
                 prompt = """
                 Identify whether this image is a GENUINE real-world photograph or an AI-GENERATED/MANIPULATED image.
                 
@@ -68,7 +66,7 @@ async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
                   "findings": ["Evidence 1", "Evidence 2"]
                 }
                 """
-                
+
                 message = HumanMessage(
                     content=[
                         {"type": "text", "text": prompt},
@@ -78,19 +76,19 @@ async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
                         },
                     ]
                 )
-                
+
                 response = await asyncio.wait_for(llm.ainvoke([message]), timeout=45.0)
                 content = response.content.strip()
                 if "```json" in content:
                     content = content.split("```json")[1].split("```")[0].strip()
                 elif "```" in content:
                     content = content.split("```")[1].split("```")[0].strip()
-                
+
                 data = json.loads(content)
                 # Map authenticity to a 'fake score' for the internal engine
                 is_real = data.get("is_real_photograph", True)
                 auth_score = float(data.get("authenticity_score", 1.0))
-                
+
                 return {
                     "is_ai_generated": not is_real,
                     "confidence_score": (1.0 - auth_score) if is_real else auth_score,
@@ -103,7 +101,7 @@ async def _vertex_vision_detect(state: AgentState) -> AgentFinding:
         # Run all frames in parallel
         results = await asyncio.gather(*[process_frame(f) for f in target_frames])
         valid_results = [r for r in results if r]
-        
+
     except Exception as e:
         print(f"[DeepFake/Vertex] Process failed: {e}")
 
@@ -157,14 +155,14 @@ async def _heuristic_detect(state: AgentState) -> AgentFinding:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _build_findings(max_score: float, avg_score: float, flagged: List[str], source: str) -> List[str]:
+def _build_findings(max_score: float, avg_score: float, flagged: list[str], source: str) -> list[str]:
     res = [f"Detection source: {source}"]
     if avg_score >= 80:
         res.append(f"High probability of AI generation ({avg_score:.0f}%)")
     elif avg_score >= 50:
         res.append(f"Possible AI manipulation detected ({avg_score:.0f}%)")
     else:
-        res.append(f"No strong AI generation signals found.")
+        res.append("No strong AI generation signals found.")
     res.extend(flagged)
     return res
 
@@ -176,8 +174,8 @@ def _error_finding(message: str) -> AgentFinding:
 @traceable(name="deepfake_detector")
 async def deepfake_detector_node(state: AgentState) -> AgentFinding:
     """Main node entry point (Online Only)."""
-    print(f"\n[AGENT] deepfake_detector: Started cloud analysis...")
-    
+    print("\n[AGENT] deepfake_detector: Started cloud analysis...")
+
 
     # 2. Vertex AI (if credits)
     if settings.google_cloud_project:
@@ -185,7 +183,7 @@ async def deepfake_detector_node(state: AgentState) -> AgentFinding:
 
     # 3. Groq Vision fallback
     if settings.groq_api_key:
-        # We've removed groq_vision_detect, but if we wanted to keep it, 
+        # We've removed groq_vision_detect, but if we wanted to keep it,
         # we'd need to restore the function. For now, let's just fallback to heuristic
         # if Vertex fails or is not configured.
         pass

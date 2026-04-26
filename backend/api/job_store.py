@@ -11,8 +11,8 @@ In production, replace with Redis + a proper task queue (Celery / ARQ).
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 # ── Primary store ─────────────────────────────────────────────────────────────
 # job_id (str) → job dict:
@@ -42,10 +42,10 @@ _url_to_job: dict[str, str] = {}
 
 def _ts() -> str:
     """Compact UTC timestamp for log lines."""
-    return datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
+    return datetime.now(UTC).strftime("%H:%M:%S.%f")[:-3]
 
 
-def create_job(job_id: str, video_url: Optional[str] = None) -> dict[str, Any]:
+def create_job(job_id: str, video_url: str | None = None) -> dict[str, Any]:
     """
     Register a new job and return its initial dict.
     Also records the URL → job_id mapping for deduplication.
@@ -72,7 +72,7 @@ def create_job(job_id: str, video_url: Optional[str] = None) -> dict[str, Any]:
     return job
 
 
-def find_active_job_for_url(video_url: Optional[str]) -> Optional[str]:
+def find_active_job_for_url(video_url: str | None) -> str | None:
     """
     Return the job_id of an in-progress job for this URL, or None.
 

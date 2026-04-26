@@ -1,8 +1,8 @@
 """Vigilens FastAPI application entry point."""
 
+import asyncio
 import os
 import sys
-import asyncio
 
 # CRITICAL WINDOWS FIX: Force ProactorEventLoop to support subprocesses (FFmpeg/yt-dlp)
 if sys.platform == 'win32':
@@ -12,11 +12,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import settings
+
 try:
     from api.routes.analyze import router as analyze_router
     from api.routes.health import router as health_router
-    from api.routes.status import router as status_router
     from api.routes.register import router as register_router
+    from api.routes.status import router as status_router
 except Exception as e:
     print(f"\n[CRITICAL ERROR] Failed to import routers: {e}", flush=True)
     import traceback
