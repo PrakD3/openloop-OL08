@@ -29,7 +29,7 @@ export function LocationMap({ latitude, longitude, label }: LocationMapProps) {
     // Fix for Leaflet default icon paths in Next.js
     if (typeof window !== 'undefined') {
       const L = require('leaflet');
-      L.Icon.Default.prototype._getIconUrl = undefined;
+      // Use a more robust way to fix icon paths
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
         iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
