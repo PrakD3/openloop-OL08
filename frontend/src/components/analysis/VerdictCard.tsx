@@ -1,81 +1,122 @@
-'use client';
+"use client";
 
-import { useTranslation } from 'react-i18next';
-import { Share2, MapPin, Calendar, AlertTriangle, CheckCircle2, XCircle, FileText } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ScoreRing } from './ScoreRing';
-import { ModelBreakdown } from './ModelBreakdown';
-import { SOSMap } from './SOSMap';
-import { cn, getVerdictBg, getVerdictColor } from '@/lib/utils';
-import type { AnalysisResult } from '@/types';
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import {
+  Share2,
+  MapPin,
+  Calendar,
+  AlertTriangle,
+  FileText,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScoreRing } from "./ScoreRing";
+import { ModelBreakdown } from "./ModelBreakdown";
+import { SOSMap } from "./SOSMap";
+import { cn, getVerdictBg, getVerdictColor } from "@/lib/utils";
+import type {
+  AnalysisResult,
+  UploaderIntelligence,
+  ReverseSearchResult,
+  CommentIntelligence,
+} from "@/types";
 
 interface VerdictCardProps {
   result: AnalysisResult;
 }
 
 const DISASTER_EMOJI: Record<string, string> = {
-  flood: '🌊',
-  earthquake: '🏚️',
-  cyclone: '🌀',
-  tsunami: '🌊',
-  wildfire: '🔥',
-  landslide: '⛰️',
-  unknown: '⚠️',
+  flood: "🌊",
+  earthquake: "🏚️",
+  cyclone: "🌀",
+  tsunami: "🌊",
+  wildfire: "🔥",
+  landslide: "⛰️",
+  unknown: "⚠️",
 };
+
+const FLAG_DISPLAY_MAP: Record<string, string> = {
+  API_RESPONSE_ERROR_CONTEXT_ANALYSER: "⚠️ Context verification incomplete",
+  API_RESPONSE_ERROR_SOURCE_HUNTER: "⚠️ Source tracing incomplete",
+  API_RESPONSE_ERROR_DEEPFAKE: "⚠️ Deepfake analysis incomplete",
+};
+
+const displayFlags = (flags: string[]): string[] =>
+  flags.filter(Boolean).map((f) => FLAG_DISPLAY_MAP[f] ?? f);
 
 export function VerdictCard({ result }: VerdictCardProps) {
   const { t } = useTranslation();
 
+  const [showUploader, setShowUploader] = useState(false);
+  const [showReverseSearch, setShowReverseSearch] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
   const verdictLabel = t(`verdict.${result.verdict}`);
-  const deepfakeAgent = result.agents.find((a) => a.agentId === 'deepfake-detector');
+  const deepfakeAgent = result.agents.find(
+    (a) => a.agentId === "deepfake-detector",
+  );
   const hasModelScores = (deepfakeAgent?.modelScores?.length ?? 0) > 0;
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: `Vigilens — ${verdictLabel}`,
-        text: result.summary,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (!result.jobId) {
+      toast.error("Share unavailable — analysis still in progress");
+      return;
+    }
+    const shareUrl = `${window.location.origin}/v/${result.jobId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Analysis link copied to clipboard");
+    } catch {
+      toast.error("Failed to copy link");
     }
   };
 
   return (
     <div className="space-y-4">
       {/* Main verdict card */}
-      <Card className={cn('border-2 transition-all', getVerdictBg(result.verdict))}>
+      <Card
+        className={cn("border-2 transition-all", getVerdictBg(result.verdict))}
+      >
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               {/* Disaster type badge */}
-              {result.disasterType && result.disasterType !== 'unknown' && (
+              {result.disasterType && result.disasterType !== "unknown" && (
                 <p className="text-xs text-muted-foreground mb-1">
-                  {DISASTER_EMOJI[result.disasterType]} Disaster type:{' '}
-                  <span className="font-semibold capitalize">{result.disasterType}</span>
+                  {DISASTER_EMOJI[result.disasterType]} Disaster type:{" "}
+                  <span className="font-semibold capitalize">
+                    {result.disasterType}
+                  </span>
                 </p>
               )}
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                {t('analysis.verdict')}
+                {t("analysis.verdict")}
               </p>
-              <CardTitle className={cn('text-3xl font-black', getVerdictColor(result.verdict))}>
+              <CardTitle
+                className={cn(
+                  "text-3xl font-black",
+                  getVerdictColor(result.verdict),
+                )}
+              >
                 {verdictLabel}
               </CardTitle>
             </div>
             <div className="flex items-center gap-4">
               <ScoreRing
                 score={result.credibilityScore}
-                label={t('analysis.credibilityScore')}
+                label={t("analysis.credibilityScore")}
                 size={100}
                 strokeWidth={8}
-                colorClass={result.verdict === 'real' ? 'text-accent' : 'text-destructive'}
+                colorClass={
+                  result.verdict === "real" ? "text-accent" : "text-destructive"
+                }
               />
               <ScoreRing
                 score={result.panicIndex * 10}
-                label={t('analysis.panicIndex')}
+                label={t("analysis.panicIndex")}
                 size={100}
                 strokeWidth={8}
                 colorClass="text-primary"
@@ -102,11 +143,14 @@ export function VerdictCard({ result }: VerdictCardProps) {
           {result.keyFlags.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('analysis.keyFlags')}
+                {t("analysis.keyFlags")}
               </p>
               <div className="flex flex-wrap gap-2">
-                {result.keyFlags.map((flag, i) => (
-                  <div key={i} className="flex items-center gap-1 text-xs bg-secondary rounded-full px-3 py-1">
+                {displayFlags(result.keyFlags).map((flag, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-1 text-xs bg-secondary rounded-full px-3 py-1"
+                  >
                     <AlertTriangle className="h-3 w-3 text-destructive" />
                     {flag}
                   </div>
@@ -124,7 +168,9 @@ export function VerdictCard({ result }: VerdictCardProps) {
           <div className="grid grid-cols-2 gap-3 text-xs">
             {result.sourceOrigin && (
               <div className="space-y-1">
-                <p className="font-medium text-muted-foreground">{t('analysis.sourceOrigin')}</p>
+                <p className="font-medium text-muted-foreground">
+                  {t("analysis.sourceOrigin")}
+                </p>
                 <a
                   href={result.sourceOrigin}
                   target="_blank"
@@ -151,19 +197,25 @@ export function VerdictCard({ result }: VerdictCardProps) {
                 <p>{result.claimedLocation}</p>
               </div>
             )}
-            {result.actualLocation && result.actualLocation !== result.claimedLocation && (
-              <div className="space-y-1">
-                <p className="font-medium text-destructive flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> Actual Location
-                </p>
-                <p className="text-destructive">{result.actualLocation}</p>
-              </div>
-            )}
+            {result.actualLocation &&
+              result.actualLocation !== result.claimedLocation && (
+                <div className="space-y-1">
+                  <p className="font-medium text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> Actual Location
+                  </p>
+                  <p className="text-foreground">{result.actualLocation}</p>
+                </div>
+              )}
           </div>
 
-          <Button onClick={handleShare} variant="outline" size="sm" className="w-full">
+          <Button
+            onClick={handleShare}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          >
             <Share2 className="h-4 w-4 mr-2" />
-            {t('analysis.shareResult')}
+            {t("analysis.shareResult")}
           </Button>
         </CardContent>
       </Card>
@@ -179,6 +231,197 @@ export function VerdictCard({ result }: VerdictCardProps) {
           <CardContent>
             <SOSMap sosRegion={result.sosRegion} />
           </CardContent>
+        </Card>
+      )}
+
+      {/* SOURCE INTELLIGENCE panel */}
+      {result.uploaderIntelligence && (
+        <Card className="border border-border">
+          <CardHeader
+            className="pb-2 cursor-pointer select-none"
+            onClick={() => setShowUploader(!showUploader)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                🕵️ Source Intelligence
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {showUploader ? "▲" : "▼"}
+              </span>
+            </div>
+          </CardHeader>
+          {showUploader && (
+            <CardContent className="space-y-3 pt-0">
+              <div className="flex items-center gap-3">
+                <ScoreRing
+                  score={result.uploaderIntelligence.trustScore}
+                  label="Trust Score"
+                  size={72}
+                  strokeWidth={6}
+                  colorClass={
+                    result.uploaderIntelligence.trustScore >= 60
+                      ? "text-accent"
+                      : "text-destructive"
+                  }
+                />
+                <p className="text-sm text-foreground flex-1">
+                  {result.uploaderIntelligence.uploaderSummary}
+                </p>
+              </div>
+              {result.uploaderIntelligence.redFlags.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-destructive mb-1">
+                    Red Flags
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.uploaderIntelligence.redFlags.map((f, i) => (
+                      <Badge key={i} variant="destructive" className="text-xs">
+                        {f}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {result.uploaderIntelligence.trustSignals.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-accent mb-1">
+                    Trust Signals
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.uploaderIntelligence.trustSignals.map((s, i) => (
+                      <Badge key={i} variant="real" className="text-xs">
+                        {s}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {result.uploaderIntelligence.temporalNote && (
+                <p className="text-xs text-muted-foreground italic">
+                  {result.uploaderIntelligence.temporalNote}
+                </p>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* REVERSE SEARCH panel */}
+      {result.reverseSearch && (
+        <Card className="border border-border">
+          <CardHeader
+            className="pb-2 cursor-pointer select-none"
+            onClick={() => setShowReverseSearch(!showReverseSearch)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                🔍 Reverse Search
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {showReverseSearch ? "▲" : "▼"}
+              </span>
+            </div>
+          </CardHeader>
+          {showReverseSearch && (
+            <CardContent className="space-y-2 pt-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">
+                  Prior appearances:{" "}
+                  <strong>{result.reverseSearch.priorAppearancesCount}</strong>
+                </span>
+                <Badge
+                  variant={
+                    result.reverseSearch.temporalDisplacementRisk === "high"
+                      ? "destructive"
+                      : result.reverseSearch.temporalDisplacementRisk ===
+                          "medium"
+                        ? "outline"
+                        : "real"
+                  }
+                  className="text-xs capitalize"
+                >
+                  {result.reverseSearch.temporalDisplacementRisk} temporal risk
+                </Badge>
+              </div>
+              {result.reverseSearch.bestGuessLabels.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Identified as:{" "}
+                  {result.reverseSearch.bestGuessLabels.join(", ")}
+                </p>
+              )}
+              {result.reverseSearch.matchingPages.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-1">Matching pages:</p>
+                  <ul className="space-y-1">
+                    {result.reverseSearch.matchingPages
+                      .slice(0, 5)
+                      .map((page, i) => (
+                        <li key={i} className="text-xs">
+                          <a
+                            href={page.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline truncate block"
+                          >
+                            {page.title || page.url}
+                          </a>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* COMMUNITY INTELLIGENCE panel */}
+      {result.commentIntelligence && (
+        <Card className="border border-border">
+          <CardHeader
+            className="pb-2 cursor-pointer select-none"
+            onClick={() => setShowComments(!showComments)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                💬 Community Intelligence
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {showComments ? "▲" : "▼"}
+              </span>
+            </div>
+          </CardHeader>
+          {showComments && (
+            <CardContent className="space-y-2 pt-0">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    result.commentIntelligence.communityVerdict ===
+                    "confirms_real"
+                      ? "real"
+                      : result.commentIntelligence.communityVerdict ===
+                          "disputes_authenticity"
+                        ? "destructive"
+                        : "outline"
+                  }
+                  className="text-xs capitalize"
+                >
+                  {result.commentIntelligence.communityVerdict.replace(
+                    /_/g,
+                    " ",
+                  )}
+                </Badge>
+              </div>
+              <p className="text-sm text-foreground">
+                {result.commentIntelligence.consensusSummary}
+              </p>
+              {result.commentIntelligence.notableComment && (
+                <blockquote className="border-l-2 border-border pl-3 text-xs text-muted-foreground italic">
+                  {result.commentIntelligence.notableComment}
+                </blockquote>
+              )}
+            </CardContent>
+          )}
         </Card>
       )}
     </div>
