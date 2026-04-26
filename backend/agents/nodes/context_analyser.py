@@ -546,7 +546,7 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
     LangGraph node entry point.
     Runs: transcription + OCR + GDACS + LLM synthesis concurrently where possible.
     """
-    print(f"\n[AGENT] context_analyser: Started context & credibility analysis...")
+    print("\n[AGENT] context_analyser: Started context & credibility analysis...")
     keyframes = state.get("keyframes", [])
     audio_path = state.get("audio_path")
     claimed_location = (
@@ -578,16 +578,6 @@ async def context_analyser_node(state: AgentState) -> AgentFinding:
 
     # Log OCR result
     logger.info(f"[CONTEXT] OCR extracted: {ocr_text[:200] if ocr_text else 'nothing'}")
-
-    # Build transcript section with graceful None handling
-    transcript_section = (
-        f"AUDIO TRANSCRIPT:\n{transcript}"
-        if transcript
-        else "AUDIO TRANSCRIPT: [Unavailable — transcription failed or video has no speech]"
-    )
-    ocr_section = (
-        f"ON-SCREEN TEXT (OCR):\n{ocr_text}" if ocr_text else "ON-SCREEN TEXT: [None detected]"
-    )
 
     # Check claims in transcript
     claims = await _check_claims(transcript or "")
