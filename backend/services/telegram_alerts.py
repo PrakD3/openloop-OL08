@@ -57,25 +57,28 @@ async def send_verdict_alert(
     if key_flags:
         clean_flags = [f for f in key_flags if not f.startswith("API_RESPONSE_ERROR")]
         if clean_flags:
-            flags_text = "\n🏴 *Flags:* " + " | ".join(clean_flags[:3])
+            flags_text = "\n🏴 <b>Flags:</b> " + " | ".join(clean_flags[:3])
 
-    location_text = f"\n📍 *Location:* {actual_location}" if actual_location else ""
+    location_text = f"\n📍 <b>Location:</b> {actual_location}" if actual_location else ""
 
     short_url = video_url[:70] + "..." if len(video_url) > 70 else video_url
     analysis_link = f"https://vigilens.app/v/{job_id}" if job_id else ""
 
     message = (
-        f"{emoji} *VIGILENS ALERT*\n"
+        f"{emoji} <b>VIGILENS ALERT</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"*Verdict:* {verdict.upper()}\n"
-        f"*Credibility:* {credibility_score}/100\n"
-        f"*Panic Index:* {panic_index}/100"
+        f"<b>Verdict:</b> {verdict.upper()}\n"
+        f"<b>Credibility:</b> {credibility_score}/100\n"
+        f"<b>Panic Index:</b> {panic_index}/100"
         f"{location_text}"
         f"{flags_text}\n\n"
-        f"📹 `{short_url}`\n\n"
-        f"_{summary[:180]}..._"
-        + (f"\n\n🔗 [Full Analysis]({analysis_link})" if analysis_link else "")
+        f"📹 <code>{short_url}</code>\n\n"
+        f"<i>{summary[:180]}...</i>"
+        + (f'\n\n🔗 <a href="{analysis_link}">Full Analysis</a>' if analysis_link else "")
     )
+    
+    # Escape common HTML tags if summary contains them (minimal approach)
+    message = message.replace("< ", "&lt; ").replace(" >", " &gt;")
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -84,7 +87,7 @@ async def send_verdict_alert(
                 json={
                     "chat_id": settings.telegram_channel_id,
                     "text": message,
-                    "parse_mode": "Markdown",
+                    "parse_mode": "HTML",
                     "disable_web_page_preview": True,
                 },
             )
