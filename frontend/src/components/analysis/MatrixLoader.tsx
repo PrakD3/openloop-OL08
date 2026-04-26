@@ -16,22 +16,43 @@ export function MatrixLoader({ videoUrl, isComplete, onAnimationComplete }: Matr
   const [isPortrait, setIsPortrait] = useState(false);
 
   useEffect(() => {
-    // Extract thumbnail
-    const demo = DEMO_VIDEOS.find((v) => v.url === videoUrl);
-    if (demo) {
-      setThumbnail(demo.thumbnail);
-    } else {
-      // Improved YouTube Regex
+    const fetchMetadata = async () => {
+      // First check demo data
+      const demo = DEMO_VIDEOS.find((v) => v.url === videoUrl);
+      if (demo) {
+        setThumbnail(demo.thumbnail);
+        return;
+      }
+
+      // Then try YouTube regex for quick local resolution
       const ytMatch = videoUrl.match(
         /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=)?(?:embed\/)?(?:v\/)?(?:shorts\/)?([^?&"'>]+)/
       );
       if (ytMatch && ytMatch[1]) {
-        // Use hqdefault as maxresdefault isn't always available
         setThumbnail(`https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`);
-      } else {
-        // Default forensic placeholder for Reddit, X, etc.
+        return;
+      }
+
+      // Finally, call our metadata API for other sites (Reddit, X, etc.)
+      try {
+        const response = await fetch(`/api/metadata?url=${encodeURIComponent(videoUrl)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.thumbnail) {
+            setThumbnail(data.thumbnail);
+          } else {
+            setThumbnail('/images/forensic-placeholder.png');
+          }
+        } else {
+          setThumbnail('/images/forensic-placeholder.png');
+        }
+      } catch (err) {
         setThumbnail('/images/forensic-placeholder.png');
       }
+    };
+
+    if (videoUrl) {
+      fetchMetadata();
     }
   }, [videoUrl]);
 
@@ -102,10 +123,13 @@ export function MatrixLoader({ videoUrl, isComplete, onAnimationComplete }: Matr
                   />
                   {/* Platform Badge */}
                   <div className="absolute top-4 left-4 z-40 bg-foreground text-background px-3 py-1 text-[10px] font-black uppercase tracking-widest border-2 border-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]">
-                    {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? 'Source: YouTube' : 
-                     videoUrl.includes('reddit.com') ? 'Source: Reddit' :
-                     videoUrl.includes('twitter.com') || videoUrl.includes('x.com') ? 'Source: X / Twitter' :
-                     'Source: External Link'}
+                    {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')
+                      ? 'Source: YouTube'
+                      : videoUrl.includes('reddit.com')
+                        ? 'Source: Reddit'
+                        : videoUrl.includes('twitter.com') || videoUrl.includes('x.com')
+                          ? 'Source: X / Twitter'
+                          : 'Source: External Link'}
                   </div>
                   {/* Scanning Line */}
                   <motion.div
