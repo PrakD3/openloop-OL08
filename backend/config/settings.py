@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     # ── Server ────────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
     port: int = 8000
+    cors_allowed_origins: str = "*"  # Comma-separated list of origins
 
     class Config:
         env_file = ".env"

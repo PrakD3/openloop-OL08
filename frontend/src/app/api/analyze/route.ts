@@ -2,7 +2,7 @@ import { config } from '@/lib/config';
 import { DEMO_VIDEOS } from '@/lib/demoData';
 import { type NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = 'http://127.0.0.1:8888';
+const BACKEND_URL = config.backendUrl;
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_RETRIES = 200; // 400s total
 

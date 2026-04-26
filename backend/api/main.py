@@ -48,9 +48,12 @@ async def log_requests(request, call_next):
     print(f"[BACKEND] Finished {request.method} request to {request.url.path} with status {response.status_code}", flush=True)
     return response
 
+# Get allowed origins from settings or default to wildcard for flexible deployment
+allowed_origins = settings.cors_allowed_origins.split(",") if hasattr(settings, 'cors_allowed_origins') and settings.cors_allowed_origins else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://vigilens.vercel.app"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
